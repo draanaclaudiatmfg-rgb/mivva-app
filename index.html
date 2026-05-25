@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Mivva — Área Restrita</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --p: #3D1F4E;
+  --pm: #5C2D6E;
+  --pl: #7A4A8A;
+  --pale: #EDE8F2;
+  --acc: #C4A8D4;
+  --bg: #FAF9F7;
+  --bg2: #F2EFF8;
+  --white: #ffffff;
+  --text: #1a1a1a;
+  --muted: #6b6b6b;
+  --border: #e0dbe8;
+  --green: #3B6D11;
+  --green-bg: #EAF3DE;
+  --red: #A32D2D;
+  --red-bg: #FCEBEB;
+  --amber: #854F0B;
+  --amber-bg: #FAEEDA;
+  --blue: #185FA5;
+  --blue-bg: #E6F1FB;
+  --radius: 10px;
+  --shadow: 0 2px 12px rgba(61,31,78,0.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;}
+h1,h2,h3{font-family:'Cormorant Garamond',serif;}
+
+/* ── LOGIN ── */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--p);}
+.login-box{background:var(--white);border-radius:16px;padding:48px 40px;width:360px;text-align:center;}
+.login-logo{font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:300;color:var(--p);letter-spacing:4px;margin-bottom:4px;}
+.login-sub{font-size:12px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:32px;}
+.login-box input{width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;margin-bottom:12px;outline:none;transition:border 0.2s;}
+.login-box input:focus{border-color:var(--pm);}
+.btn-login{width:100%;padding:12px;background:var(--p);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;letter-spacing:0.5px;transition:background 0.2s;}
+.btn-login:hover{background:var(--pm);}
+.login-err{color:var(--red);font-size:12px;margin-top:8px;}
+
+/* ── APP SHELL ── */
+#app{display:none;}
+.topbar{background:var(--p);padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;}
+.topbar-brand{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;color:#fff;letter-spacing:3px;}
+.topbar-right{display:flex;align-items:center;gap:16px;}
+.topbar-user{font-size:12px;color:rgba(255,255,255,0.7);}
+.btn-logout{font-size:12px;color:rgba(255,255,255,0.6);background:none;border:1px solid rgba(255,255,255,0.2);padding:4px 12px;border-radius:20px;cursor:pointer;}
+.btn-logout:hover{color:#fff;border-color:rgba(255,255,255,0.5);}
+
+/* ── NAV ── */
+.nav{background:var(--white);border-bottom:1px solid var(--border);display:flex;padding:0 24px;overflow-x:auto;gap:0;}
+.nav-btn{padding:12px 16px;font-size:13px;color:var(--muted);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:6px;transition:color 0.15s;font-family:'DM Sans',sans-serif;}
+.nav-btn.active{color:var(--pm);font-weight:500;border-bottom-color:var(--pm);}
+.nav-btn:hover:not(.active){color:var(--text);}
+.nav-btn.hidden{display:none;}
+
+/* ── CONTENT ── */
+.content{padding:24px;max-width:1200px;margin:0 auto;}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+
+/* ── METRICS ── */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
+.metric{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+.metric-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+.metric-value{font-size:26px;font-family:'Cormorant Garamond',serif;font-weight:500;color:var(--p);}
+.metric-value.green{color:var(--green);}
+.metric-value.red{color:var(--red);}
+.metric-value.amber{color:var(--amber);}
+
+/* ── SECTION HEADER ── */
+.sec-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.sec-header h2{font-size:20px;font-weight:400;color:var(--p);}
+.btn-primary{background:var(--pm);color:#fff;border:none;padding:8px 16px;border-radius:var(--radius);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;}
+.btn-primary:hover{background:var(--p);}
+.btn-sm{padding:4px 12px;font-size:12px;background:var(--pm);color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.btn-sm:hover{background:var(--p);}
+.btn-sm.outline{background:none;color:var(--pm);border:1px solid var(--pm);}
+
+/* ── TABLE ── */
+.table-wrap{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-weight:500;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg);}
+td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--bg2);}
+
+/* ── BADGES ── */
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;}
+.bg-green{background:var(--green-bg);color:var(--green);}
+.bg-red{background:var(--red-bg);color:var(--red);}
+.bg-amber{background:var(--amber-bg);color:var(--amber);}
+.bg-purple{background:var(--pale);color:var(--p);}
+.bg-blue{background:var(--blue-bg);color:var(--blue);}
+.bg-gray{background:#F1EFE8;color:#5F5E5A;}
+
+/* ── FILTER ROW ── */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.filters select,.filters input{font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--white);color:var(--text);font-family:'DM Sans',sans-serif;}
+
+/* ── MODAL ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;}
+.modal-bg.open{display:flex;}
+.modal{background:var(--white);border-radius:14px;padding:28px;width:min(560px,94vw);max-height:88vh;overflow-y:auto;}
+.modal h3{font-size:20px;font-weight:400;color:var(--p);margin-bottom:20px;font-family:'Cormorant Garamond',serif;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.form-grid.full{grid-template-columns:1fr;}
+.form-group label{display:block;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:5px;}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:'DM Sans',sans-serif;color:var(--text);background:var(--white);outline:none;transition:border 0.2s;}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--pm);}
+.form-group textarea{min-height:80px;resize:vertical;}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;}
+.btn-cancel{background:none;border:1px solid var(--border);padding:8px 16px;border-radius:var(--radius);font-size:13px;cursor:pointer;color:var(--text);font-family:'DM Sans',sans-serif;}
+.btn-save{background:var(--pm);color:#fff;border:none;padding:8px 18px;border-radius:var(--radius);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+
+/* ── AGENDA CARDS ── */
+.agenda-section{margin-bottom:20px;}
+.agenda-section-label{font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;}
+.appt-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:8px;display:flex;gap:14px;align-items:flex-start;cursor:pointer;transition:border-color 0.15s;}
+.appt-card:hover{border-color:var(--acc);}
+.appt-card.alert{border-color:#F09595;background:rgba(252,235,235,0.3);}
+.appt-card.warn{border-color:#FAC775;background:rgba(250,238,218,0.2);}
+.appt-time{font-size:13px;font-weight:500;min-width:46px;padding-top:2px;color:var(--p);}
+.appt-info{flex:1;}
+.appt-name{font-size:13px;font-weight:500;}
+.appt-detail{font-size:12px;color:var(--muted);margin-top:2px;}
+.appt-flags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;}
+.flag{font-size:11px;padding:2px 7px;border-radius:20px;}
+
+/* ── PROGRESS ── */
+.prog-bar-wrap{background:var(--bg);border-radius:20px;height:5px;width:90px;}
+.prog-bar{height:5px;border-radius:20px;background:var(--pm);}
+.prog-bar.done{background:var(--green);}
+.prog-bar.warn{background:var(--red);}
+
+/* ── EXAME CARDS ── */
+.exame-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;}
+.exame-card.urgente{border-left:3px solid var(--red);border-radius:0 var(--radius) var(--radius) 0;}
+.exame-card.pendente{border-left:3px solid #EF9F27;border-radius:0 var(--radius) var(--radius) 0;}
+.exame-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.exame-name{font-weight:500;font-size:13px;}
+.exame-detail{font-size:12px;color:var(--muted);}
+
+/* ── RH ── */
+.colab-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:10px;}
+.colab-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.colab-name{font-size:15px;font-weight:500;color:var(--p);font-family:'Cormorant Garamond',serif;}
+.colab-cargo{font-size:12px;color:var(--muted);}
+.colab-info{display:flex;gap:20px;font-size:12px;color:var(--muted);}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:48px 20px;color:var(--muted);}
+.empty-icon{font-size:32px;margin-bottom:12px;opacity:0.4;}
+
+/* ── ALERT BANNER ── */
+.alert-banner{background:var(--red-bg);border:1px solid #F09595;border-radius:var(--radius);padding:10px 16px;margin-bottom:16px;font-size:13px;color:var(--red);display:flex;align-items:center;gap:8px;}
+
+/* ── LOADING ── */
+.loading{text-align:center;padding:40px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">MIVVA</div>
+    <div class="login-sub">Área Restrita</div>
+    <input type="email" id="email-input" placeholder="E-mail" autocomplete="email"/>
+    <input type="password" id="pass-input" placeholder="Senha" autocomplete="current-password"/>
+    <button class="btn-login" onclick="doLogin()">Entrar</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand">MIVVA</div>
+    <div class="topbar-right">
+      <span class="topbar-user" id="user-label"></span>
+      <button class="btn-logout" onclick="doLogout()">Sair</button>
+    </div>
+  </div>
+  <div class="nav" id="main-nav">
+    <button class="nav-btn active" onclick="switchTab('agenda')" id="nav-agenda">📅 Agenda</button>
+    <button class="nav-btn" onclick="switchTab('agendamentos')" id="nav-agendamentos">📋 Agendamentos</button>
+    <button class="nav-btn" onclick="switchTab('programas')" id="nav-programas">🎵 Programas</button>
+    <button class="nav-btn financeiro-nav" onclick="switchTab('financeiro')" id="nav-financeiro">💰 Financeiro</button>
+    <button class="nav-btn" onclick="switchTab('exames')" id="nav-exames">🔬 Exames</button>
+    <button class="nav-btn" onclick="switchTab('pacientes')" id="nav-pacientes">👩 Pacientes</button>
+    <button class="nav-btn financeiro-nav" onclick="switchTab('rh')" id="nav-rh">👥 RH & Salários</button>
+  </div>
+
+  <div class="content">
+
+    <!-- AGENDA -->
+    <div class="tab-pane active" id="tab-agenda">
+      <div class="metrics" id="agenda-metrics">
+        <div class="metric"><div class="metric-label">Hoje</div><div class="metric-value" id="m-hoje">—</div></div>
+        <div class="metric"><div class="metric-label">Esta semana</div><div class="metric-value" id="m-semana">—</div></div>
+        <div class="metric"><div class="metric-label">Pag. pendentes</div><div class="metric-value red" id="m-pend">—</div></div>
+        <div class="metric"><div class="metric-label">Exames p/ revisar</div><div class="metric-value amber" id="m-exames">—</div></div>
+      </div>
+      <div class="sec-header">
+        <h2 id="agenda-titulo">Agenda de hoje</h2>
+        <button class="btn-primary" onclick="openModal('agendamento')">+ Novo agendamento</button>
+      </div>
+      <div id="agenda-list"><div class="loading">Carregando...</div></div>
+    </div>
+
+    <!-- AGENDAMENTOS -->
+    <div class="tab-pane" id="tab-agendamentos">
+      <div class="sec-header">
+        <h2>Todos os agendamentos</h2>
+        <button class="btn-primary" onclick="openModal('agendamento')">+ Novo</button>
+      </div>
+      <div class="filters">
+        <select id="f-status" onchange="loadAgendamentos()">
+          <option value="">Todos os status</option>
+          <option value="agendada">Agendada</option>
+          <option value="realizada">Realizada</option>
+          <option value="cancelada">Cancelada</option>
+        </select>
+        <select id="f-tipo" onchange="loadAgendamentos()">
+          <option value="">Todos os tipos</option>
+          <option value="sinfonia">Sinfonia</option>
+          <option value="avulsa">Avulsa</option>
+          <option value="pacote">Pacote</option>
+        </select>
+        <input type="text" id="f-busca" placeholder="Buscar paciente..." oninput="loadAgendamentos()" style="flex:1;min-width:140px;"/>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Data</th><th>Paciente</th><th>Tipo</th>
+            <th>Pagamento</th><th>Valor</th><th>NF</th>
+            <th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="agendamentos-body"><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PROGRAMAS -->
+    <div class="tab-pane" id="tab-programas">
+      <div class="metrics">
+        <div class="metric"><div class="metric-label">Sinfonia ativos</div><div class="metric-value" id="m-sinfonia">—</div></div>
+        <div class="metric"><div class="metric-label">Pacotes ativos</div><div class="metric-value" id="m-pacotes">—</div></div>
+        <div class="metric"><div class="metric-label">Pag. pendentes</div><div class="metric-value red" id="m-prog-pend">—</div></div>
+      </div>
+      <div class="sec-header">
+        <h2>Programas ativos</h2>
+        <button class="btn-primary" onclick="openModal('programa')">+ Novo programa</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Paciente</th><th>Programa</th><th>Modalidade</th>
+            <th>Forma pag.</th><th>Valor</th><th>Progresso</th>
+            <th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="programas-body"><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FINANCEIRO -->
+    <div class="tab-pane" id="tab-financeiro">
+      <div class="metrics">
+        <div class="metric"><div class="metric-label">Receita confirmada</div><div class="metric-value green" id="m-receita">R$ 0</div></div>
+        <div class="metric"><div class="metric-label">A receber</div><div class="metric-value amber" id="m-areceber">R$ 0</div></div>
+        <div class="metric"><div class="metric-label">NF emitidas</div><div class="metric-value" id="m-nf">0</div></div>
+        <div class="metric"><div class="metric-label">NF pendentes</div><div class="metric-value red" id="m-nfpend">0</div></div>
+      </div>
+      <div class="sec-header">
+        <h2>Lançamentos</h2>
+        <div class="filters" style="margin:0;">
+          <select id="f-mes" onchange="loadFinanceiro()">
+            <option value="">Todos os meses</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Data</th><th>Paciente</th><th>Serviço</th>
+            <th>Forma pag.</th><th>Valor</th><th>NF</th>
+            <th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="financeiro-body"><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- EXAMES -->
+    <div class="tab-pane" id="tab-exames">
+      <div class="sec-header">
+        <h2>Exames para revisar</h2>
+        <button class="btn-primary" onclick="openModal('exame')">+ Adicionar</button>
+      </div>
+      <div id="exames-urgentes"></div>
+      <div id="exames-pendentes"></div>
+      <div id="exames-revisados"></div>
+    </div>
+
+    <!-- PACIENTES -->
+    <div class="tab-pane" id="tab-pacientes">
+      <div class="sec-header">
+        <h2>Base de pacientes</h2>
+        <button class="btn-primary" onclick="openModal('paciente')">+ Novo paciente</button>
+      </div>
+      <div class="filters">
+        <input type="text" id="f-pac" placeholder="Buscar por nome..." oninput="loadPacientes()" style="flex:1;min-width:160px;"/>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Nome</th><th>Telefone</th><th>Diagnóstico</th>
+            <th>Medicação</th><th>Programa</th><th></th>
+          </tr></thead>
+          <tbody id="pacientes-body"><tr><td colspan="6" class="loading">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RH -->
+    <div class="tab-pane" id="tab-rh">
+      <div class="sec-header">
+        <h2>Colaboradores & Salários</h2>
+        <button class="btn-primary" onclick="openModal('colaborador')">+ Novo colaborador</button>
+      </div>
+      <div id="colab-list"><div class="loading">Carregando...</div></div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<!-- MODAIS -->
+<div class="modal-bg" id="modal-bg" onclick="closeModal(event)">
+<div class="modal" onclick="event.stopPropagation()">
+  <div id="modal-inner"></div>
+  <div class="modal-actions">
+    <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+    <button class="btn-save" id="modal-save-btn" onclick="saveModal()">Salvar</button>
+  </div>
+</div>
+</div>
+
+<script>
+// ── SUPABASE CONFIG ──────────────────────────────────────────────
+const SUPA_URL = 'https://joklwxwhxrdrfeerdlgf.supabase.co';
+const SUPA_KEY = 'sb_publishable_xQYZa5MUYnL371XZMDyREw_nFLQ7bvn';
+const { createClient } = supabase;
+const sb = createClient(SUPA_URL, SUPA_KEY);
+
+// ── STATE ────────────────────────────────────────────────────────
+let currentUser = null;
+let currentProfile = null;
+let currentModal = null;
+
+// ── AUTH ─────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('email-input').value.trim();
+  const pass  = document.getElementById('pass-input').value;
+  const err   = document.getElementById('login-err');
+  err.textContent = '';
+  if (!email || !pass) { err.textContent = 'Preencha e-mail e senha.'; return; }
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) { err.textContent = 'E-mail ou senha incorretos.'; return; }
+  await initApp(data.user);
+}
+
+async function initApp(user) {
+  currentUser = user;
+  const { data: prof } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  currentProfile = prof;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('user-label').textContent = prof?.nome || user.email;
+  applyRoles();
+  switchTab('agenda');
+}
+
+function applyRoles() {
+  const isProprietaria = currentProfile?.perfil === 'proprietaria';
+  document.querySelectorAll('.financeiro-nav').forEach(el => {
+    el.style.display = isProprietaria ? '' : 'none';
+  });
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  location.reload();
+}
+
+// check session on load
+sb.auth.getSession().then(({ data: { session } }) => {
+  if (session) initApp(session.user);
+});
+
+// ── TABS ─────────────────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('nav-' + id)?.classList.add('active');
+  document.getElementById('tab-' + id)?.classList.add('active');
+  const loaders = { agenda: loadAgenda, agendamentos: loadAgendamentos,
+    programas: loadProgramas, financeiro: loadFinanceiro,
+    exames: loadExames, pacientes: loadPacientes, rh: loadRH };
+  loaders[id]?.();
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────
+function fmt(v) { return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+function fmtHora(v) { return v ? new Date(v).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : ''; }
+function fmtMoeda(v) { return v != null ? 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '—'; }
+function badge(text, cls) { return `<span class="badge ${cls}">${text}</span>`; }
+function statusBadge(s) {
+  const m = { realizada:'bg-green', agendada:'bg-blue', cancelada:'bg-red', remarcada:'bg-amber' };
+  return badge(s, m[s]||'bg-gray');
+}
+function pagBadge(s) {
+  if (!s) return badge('Sem pag.','bg-red');
+  const m = { realizada:'bg-green', pendente:'bg-amber', isenta:'bg-gray' };
+  return badge(s, m[s]||'bg-amber');
+}
+function tipoBadge(t) {
+  const m = { sinfonia:'bg-purple', avulsa:'bg-gray', pacote:'bg-blue', outro:'bg-gray' };
+  return badge(t||'—', m[t]||'bg-gray');
+}
+
+// ── AGENDA ───────────────────────────────────────────────────────
+async function loadAgenda() {
+  const hoje = new Date();
+  const start = new Date(hoje); start.setHours(0,0,0,0);
+  const end   = new Date(hoje); end.setHours(23,59,59,999);
+  document.getElementById('agenda-titulo').textContent =
+    'Agenda de hoje — ' + hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+
+  const { data } = await sb.from('agendamentos')
+    .select('*, pacientes(nome)')
+    .gte('data_hora', start.toISOString())
+    .lte('data_hora', end.toISOString())
+    .order('data_hora');
+
+  // semana
+  const startW = new Date(hoje); startW.setDate(hoje.getDate() - hoje.getDay());
+  const endW   = new Date(startW); endW.setDate(startW.getDate() + 6); endW.setHours(23,59,59,999);
+  const { count: semCnt } = await sb.from('agendamentos')
+    .select('id', {count:'exact',head:true})
+    .gte('data_hora', startW.toISOString()).lte('data_hora', endW.toISOString());
+
+  const { count: pendCnt } = await sb.from('agendamentos')
+    .select('id',{count:'exact',head:true}).is('data_pagamento',null).neq('status','cancelada');
+  const { count: examCnt } = await sb.from('exames')
+    .select('id',{count:'exact',head:true}).eq('revisado',false);
+
+  document.getElementById('m-hoje').textContent    = data?.length || 0;
+  document.getElementById('m-semana').textContent  = semCnt || 0;
+  document.getElementById('m-pend').textContent    = pendCnt || 0;
+  document.getElementById('m-exames').textContent  = examCnt || 0;
+
+  const list = document.getElementById('agenda-list');
+  if (!data?.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>Nenhum agendamento para hoje.</div>'; return; }
+
+  list.innerHTML = data.map(a => {
+    const semPag = !a.data_pagamento;
+    const cls = semPag ? 'alert' : '';
+    return `<div class="appt-card ${cls}" onclick="openModalEdit('agendamento','${a.id}')">
+      <div class="appt-time">${fmtHora(a.data_hora)}</div>
+      <div class="appt-info">
+        <div class="appt-name">${a.pacientes?.nome || '—'}</div>
+        <div class="appt-detail">${a.tipo||''} · ${a.observacoes||''}</div>
+        <div class="appt-flags">
+          ${semPag ? '<span class="flag bg-red">Sem pagamento</span>' : '<span class="flag bg-green">Pago</span>'}
+          ${a.nf_status === 'pendente' ? '<span class="flag bg-amber">NF pendente</span>' : ''}
+        </div>
+      </div>
+      ${tipoBadge(a.tipo)}
+    </div>`;
+  }).join('');
+}
+
+// ── AGENDAMENTOS ─────────────────────────────────────────────────
+async function loadAgendamentos() {
+  let q = sb.from('agendamentos').select('*, pacientes(nome)').order('data_hora', {ascending:false});
+  const status = document.getElementById('f-status')?.value;
+  const tipo   = document.getElementById('f-tipo')?.value;
+  const busca  = document.getElementById('f-busca')?.value;
+  if (status) q = q.eq('status', status);
+  if (tipo)   q = q.eq('tipo', tipo);
+  const { data } = await q.limit(100);
+
+  let rows = data || [];
+  if (busca) rows = rows.filter(r => r.pacientes?.nome?.toLowerCase().includes(busca.toLowerCase()));
+
+  const body = document.getElementById('agendamentos-body');
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="8" class="empty">Nenhum agendamento encontrado.</td></tr>'; return; }
+  body.innerHTML = rows.map(a => `<tr>
+    <td>${fmt(a.data_hora)} ${fmtHora(a.data_hora)}</td>
+    <td>${a.pacientes?.nome||'—'}</td>
+    <td>${tipoBadge(a.tipo)}</td>
+    <td>${a.forma_pagamento||'—'}</td>
+    <td>${fmtMoeda(a.valor)}</td>
+    <td><span class="badge ${a.nf_status==='emitida'?'bg-green':a.nf_status==='isenta'?'bg-gray':'bg-amber'}">${a.nf_status||'pendente'}</span>${a.nf_numero?' · Nº'+a.nf_numero:''}</td>
+    <td>${statusBadge(a.status)}</td>
+    <td><button class="btn-sm" onclick="openModalEdit('agendamento','${a.id}')">Editar</button></td>
+  </tr>`).join('');
+}
+
+// ── PROGRAMAS ────────────────────────────────────────────────────
+async function loadProgramas() {
+  const { data } = await sb.from('programas').select('*, pacientes(nome), programa_consultas(id,pago)').order('created_at',{ascending:false});
+  const rows = data || [];
+  document.getElementById('m-sinfonia').textContent = rows.filter(r=>r.tipo==='sinfonia'&&r.status==='em_andamento').length;
+  document.getElementById('m-pacotes').textContent  = rows.filter(r=>r.tipo==='pacote'&&r.status==='em_andamento').length;
+  document.getElementById('m-prog-pend').textContent= rows.filter(r=>r.status==='pag_pendente').length;
+
+  const body = document.getElementById('programas-body');
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="8" class="empty">Nenhum programa cadastrado.</td></tr>'; return; }
+  body.innerHTML = rows.map(p => {
+    const feitas = (p.programa_consultas||[]).length;
+    const total  = p.total_consultas || 6;
+    const pct    = Math.round((feitas/total)*100);
+    const barCls = pct===100?'done':pct>80?'warn':'';
+    const stMap  = {em_andamento:'bg-blue',concluido:'bg-green',cancelado:'bg-red',pausado:'bg-gray',pag_pendente:'bg-amber'};
+    return `<tr>
+      <td>${p.pacientes?.nome||'—'}</td>
+      <td>${tipoBadge(p.tipo)}</td>
+      <td>${p.modalidade||p.total_consultas+' consultas'}</td>
+      <td>${p.forma_pagamento||'—'}</td>
+      <td>${fmtMoeda(p.valor_total)}</td>
+      <td style="min-width:110px">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="prog-bar-wrap"><div class="prog-bar ${barCls}" style="width:${pct}%"></div></div>
+          <span style="font-size:11px;color:var(--muted)">${feitas}/${total}</span>
+        </div>
+      </td>
+      <td><span class="badge ${stMap[p.status]||'bg-gray'}">${p.status?.replace('_',' ')||'—'}</span></td>
+      <td><button class="btn-sm" onclick="openModalEdit('programa','${p.id}')">Ver</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── FINANCEIRO ───────────────────────────────────────────────────
+async function loadFinanceiro() {
+  if (currentProfile?.perfil !== 'proprietaria') {
+    document.getElementById('financeiro-body').innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--red)">Acesso restrito — apenas a proprietária.</td></tr>';
+    return;
+  }
+  const { data } = await sb.from('agendamentos').select('*, pacientes(nome)').order('data_hora',{ascending:false}).limit(200);
+  const rows = data || [];
+  const confirmados = rows.filter(r=>r.data_pagamento);
+  const pendentes   = rows.filter(r=>!r.data_pagamento && r.status!=='cancelada');
+  const nfEmitidas  = rows.filter(r=>r.nf_status==='emitida');
+  const nfPendentes = rows.filter(r=>r.nf_status==='pendente');
+  document.getElementById('m-receita').textContent  = fmtMoeda(confirmados.reduce((s,r)=>s+(Number(r.valor)||0),0));
+  document.getElementById('m-areceber').textContent = fmtMoeda(pendentes.reduce((s,r)=>s+(Number(r.valor)||0),0));
+  document.getElementById('m-nf').textContent       = nfEmitidas.length;
+  document.getElementById('m-nfpend').textContent   = nfPendentes.length;
+
+  const body = document.getElementById('financeiro-body');
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="8" class="empty">Nenhum lançamento.</td></tr>'; return; }
+  body.innerHTML = rows.map(a => `<tr>
+    <td>${fmt(a.data_hora)}</td>
+    <td>${a.pacientes?.nome||'—'}</td>
+    <td>${a.tipo||'—'}</td>
+    <td>${a.forma_pagamento||'—'}</td>
+    <td style="font-weight:500;color:${a.data_pagamento?'var(--green)':'var(--red)'}">${fmtMoeda(a.valor)}</td>
+    <td><span class="badge ${a.nf_status==='emitida'?'bg-green':'bg-amber'}">${a.nf_status||'pendente'}</span>${a.nf_numero?' Nº'+a.nf_numero:''}</td>
+    <td>${a.data_pagamento?'<span class="badge bg-green">Confirmado</span>':'<span class="badge bg-red">Pendente</span>'}</td>
+    <td><button class="btn-sm" onclick="openModalEdit('agendamento','${a.id}')">Editar</button></td>
+  </tr>`).join('');
+}
+
+// ── EXAMES ───────────────────────────────────────────────────────
+async function loadExames() {
+  const { data } = await sb.from('exames').select('*, pacientes(nome)').order('data_consulta');
+  const rows = data || [];
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const em3  = new Date(hoje); em3.setDate(hoje.getDate()+3);
+
+  const urgentes  = rows.filter(r=>!r.revisado && new Date(r.data_consulta)<=em3);
+  const pendentes = rows.filter(r=>!r.revisado && new Date(r.data_consulta)>em3);
+  const revisados = rows.filter(r=>r.revisado);
+
+  function exCard(e, cls) {
+    const stMap = {nao_enviou:'bg-red',aguardando:'bg-amber',parcial:'bg-amber',completo:'bg-green'};
+    return `<div class="exame-card ${cls}">
+      <div class="exame-header">
+        <span class="exame-name">${e.pacientes?.nome||'—'}</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span class="badge bg-amber">Consulta ${fmt(e.data_consulta)}</span>
+          <span class="badge ${stMap[e.status_envio]||'bg-gray'}">${e.status_envio?.replace('_',' ')||'—'}</span>
+        </div>
+      </div>
+      <div class="exame-detail">${e.exames_solicitados||'—'}</div>
+      ${e.obs_clinicas?`<div class="exame-detail" style="margin-top:4px;color:var(--p)">⚑ ${e.obs_clinicas}</div>`:''}
+      <div style="margin-top:8px;display:flex;gap:8px;">
+        ${!e.revisado?`<button class="btn-sm" onclick="marcarRevisado('${e.id}')">✓ Revisado</button>`:''}
+        <button class="btn-sm outline" onclick="openModalEdit('exame','${e.id}')">Editar</button>
+      </div>
+    </div>`;
+  }
+
+  const u = document.getElementById('exames-urgentes');
+  const p = document.getElementById('exames-pendentes');
+  const r = document.getElementById('exames-revisados');
+
+  u.innerHTML = urgentes.length ? `<div style="font-size:12px;font-weight:500;color:var(--red);margin-bottom:8px;">⚠ Urgente — consulta em até 3 dias</div>${urgentes.map(e=>exCard(e,'urgente')).join('')}` : '';
+  p.innerHTML = pendentes.length ? `<div style="font-size:12px;font-weight:500;color:var(--amber);margin:16px 0 8px;">⏱ Próximas consultas</div>${pendentes.map(e=>exCard(e,'pendente')).join('')}` : '';
+  r.innerHTML = revisados.length ? `<div style="font-size:12px;font-weight:500;color:var(--green);margin:16px 0 8px;">✓ Revisados</div>${revisados.map(e=>exCard(e,'')).join('')}` : '';
+
+  if (!rows.length) u.innerHTML = '<div class="empty"><div class="empty-icon">🔬</div>Nenhum exame cadastrado.</div>';
+}
+
+async function marcarRevisado(id) {
+  await sb.from('exames').update({revisado:true, data_revisao: new Date().toISOString().split('T')[0]}).eq('id',id);
+  loadExames();
+}
+
+// ── PACIENTES ────────────────────────────────────────────────────
+async function loadPacientes() {
+  const busca = document.getElementById('f-pac')?.value;
+  let q = sb.from('pacientes').select('*').order('nome');
+  const { data } = await q.limit(200);
+  let rows = data || [];
+  if (busca) rows = rows.filter(r=>r.nome?.toLowerCase().includes(busca.toLowerCase()));
+
+  const body = document.getElementById('pacientes-body');
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="6" class="empty">Nenhum paciente encontrado.</td></tr>'; return; }
+  body.innerHTML = rows.map(p=>`<tr>
+    <td style="font-weight:500">${p.nome}</td>
+    <td>${p.telefone||'—'}</td>
+    <td>${p.diagnostico||'—'}</td>
+    <td>${p.medicacao||'—'}</td>
+    <td>—</td>
+    <td><button class="btn-sm" onclick="openModalEdit('paciente','${p.id}')">Editar</button></td>
+  </tr>`).join('');
+}
+
+// ── RH ───────────────────────────────────────────────────────────
+async function loadRH() {
+  if (currentProfile?.perfil !== 'proprietaria') {
+    document.getElementById('colab-list').innerHTML = '<div class="empty" style="color:var(--red)">Acesso restrito — apenas a proprietária.</div>';
+    return;
+  }
+  const { data: colabs } = await sb.from('colaboradores').select('*, pagamentos_salario(*)').order('nome');
+  const list = document.getElementById('colab-list');
+  if (!colabs?.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">👥</div>Nenhum colaborador cadastrado.</div>'; return; }
+
+  list.innerHTML = colabs.map(c => {
+    const ultPag = c.pagamentos_salario?.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];
+    return `<div class="colab-card">
+      <div class="colab-header">
+        <div>
+          <div class="colab-name">${c.nome}</div>
+          <div class="colab-cargo">${c.cargo||'—'}</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-sm" onclick="openModal('salario','${c.id}')">+ Pagamento</button>
+          <button class="btn-sm outline" onclick="openModalEdit('colaborador','${c.id}')">Editar</button>
+        </div>
+      </div>
+      <div class="colab-info">
+        <span>Salário base: ${fmtMoeda(c.salario_base)}</span>
+        <span>Pix: ${c.chave_pix||'—'}</span>
+        <span>Admissão: ${fmt(c.data_admissao)}</span>
+        <span>Último pag.: ${ultPag ? fmt(ultPag.data_pagamento)+' · '+fmtMoeda(ultPag.valor_liquido) : '—'}</span>
+      </div>
+      ${c.pagamentos_salario?.length ? `
+      <div style="margin-top:12px;overflow-x:auto;">
+        <table style="font-size:12px;width:100%;">
+          <thead><tr><th>Competência</th><th>Bruto</th><th>Descontos</th><th>Líquido</th><th>Data pag.</th></tr></thead>
+          <tbody>${c.pagamentos_salario.slice(0,3).map(pg=>`<tr>
+            <td>${pg.competencia||'—'}</td>
+            <td>${fmtMoeda(pg.valor_bruto)}</td>
+            <td>${fmtMoeda(pg.descontos)}</td>
+            <td style="font-weight:500;color:var(--green)">${fmtMoeda(pg.valor_liquido)}</td>
+            <td>${fmt(pg.data_pagamento)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── MODAIS ───────────────────────────────────────────────────────
+const modalForms = {
+  agendamento: (d={}) => `<h3>Agendamento</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Paciente (nome)</label><input id="f-pac-nome" value="${d.pacientes?.nome||''}" placeholder="Nome do paciente"/></div>
+      <div class="form-group"><label>Tipo</label><select id="f-tipo-ag"><option value="avulsa" ${d.tipo==='avulsa'?'selected':''}>Avulsa</option><option value="sinfonia" ${d.tipo==='sinfonia'?'selected':''}>Sinfonia</option><option value="pacote" ${d.tipo==='pacote'?'selected':''}>Pacote</option><option value="outro" ${d.tipo==='outro'?'selected':''}>Outro</option></select></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Data e hora</label><input type="datetime-local" id="f-data-hora" value="${d.data_hora?d.data_hora.slice(0,16):''}"/></div>
+      <div class="form-group"><label>Valor (R$)</label><input type="number" id="f-valor" value="${d.valor||''}" placeholder="0,00"/></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Forma de pagamento</label><select id="f-forma-pag"><option value="">—</option><option value="Pix" ${d.forma_pagamento==='Pix'?'selected':''}>Pix</option><option value="Cartão crédito" ${d.forma_pagamento==='Cartão crédito'?'selected':''}>Cartão crédito</option><option value="Cartão débito">Cartão débito</option><option value="Transferência">Transferência</option><option value="Dinheiro">Dinheiro</option></select></div>
+      <div class="form-group"><label>Data pagamento</label><input type="date" id="f-data-pag" value="${d.data_pagamento||''}"/></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>NF status</label><select id="f-nf-status"><option value="pendente" ${d.nf_status==='pendente'?'selected':''}>Pendente</option><option value="emitida" ${d.nf_status==='emitida'?'selected':''}>Emitida</option><option value="isenta" ${d.nf_status==='isenta'?'selected':''}>Isenta</option></select></div>
+      <div class="form-group"><label>Nº NF / obs.</label><input id="f-nf-num" value="${d.nf_numero||''}" placeholder="Ex: 4521"/></div>
+    </div>
+    <div class="form-grid full">
+      <div class="form-group"><label>Status</label><select id="f-status-ag"><option value="agendada" ${d.status==='agendada'?'selected':''}>Agendada</option><option value="realizada" ${d.status==='realizada'?'selected':''}>Realizada</option><option value="cancelada" ${d.status==='cancelada'?'selected':''}>Cancelada</option><option value="remarcada" ${d.status==='remarcada'?'selected':''}>Remarcada</option></select></div>
+    </div>
+    <div class="form-grid full">
+      <div class="form-group"><label>Observações</label><textarea id="f-obs">${d.observacoes||''}</textarea></div>
+    </div>`,
+
+  paciente: (d={}) => `<h3>Paciente</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Nome completo</label><input id="f-nome" value="${d.nome||''}"/></div>
+      <div class="form-group"><label>Data de nascimento</label><input type="date" id="f-nasc" value="${d.data_nascimento||''}"/></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Telefone / WhatsApp</label><input id="f-tel" value="${d.telefone||''}"/></div>
+      <div class="form-group"><label>E-mail</label><input type="email" id="f-email-pac" value="${d.email||''}"/></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Diagnóstico</label><input id="f-diag" value="${d.diagnostico||''}" placeholder="Ex: Obesidade grau II"/></div>
+      <div class="form-group"><label>Medicação</label><input id="f-med" value="${d.medicacao||''}" placeholder="Ex: Mounjaro 7,5mg"/></div>
+    </div>
+    <div class="form-grid full">
+      <div class="form-group"><label>Observações clínicas</label><textarea id="f-obs-pac">${d.observacoes||''}</textarea></div>
+    </div>`,
+
+  programa: (d={}) => `<h3>Programa / Pacote</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Paciente (nome)</label><input id="f-pac-prog" value="${d.pacientes?.nome||''}"/></div>
+      <div class="form-group"><label>Tipo</label><select id="f-tipo-prog"><option value="sinfonia" ${d.tipo==='sinfonia'?'selected':''}>Sinfonia</option><option value="pacote" ${d.tipo==='pacote'?'selected':''}>Pacote</option><option value="outro">Outro</option></select></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Total de consultas</label><input type="number" id="f-total-cons" value="${d.total_consultas||6}"/></div>
+      <div class="form-group"><label>Valor total (R$)</label><input type="number" id="f-val-prog" value="${d.valor_total||''}"/></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Forma de pagamento</label><input id="f-forma-prog" value="${d.forma_pagamento||''}" placeholder="Ex: Pix parcelado"/></div>
+      <div class="form-group"><label>Data de início</label><input type="date" id="f-inicio-prog" value="${d.data_inicio||''}"/></div>
+    </div>
+    <div class="form-grid full">
+      <div class="form-group"><label>Status</label><select id="f-st-prog"><option value="em_andamento" ${d.status==='em_andamento'?'selected':''}>Em andamento</option><option value="pag_pendente" ${d.status==='pag_pendente'?'selected':''}>Pag. pendente</option><option value="concluido" ${d.status==='concluido'?'selected':''}>Concluído</option><option value="cancelado" ${d.status==='cancelado'?'selected':''}>Cancelado</option><option value="pausado" ${d.status==='pausado'?'selected':''}>Pausado</option></select></div>
+    </div>`,
+
+  exame: (d={}) => `<h3>Exames do paciente</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Paciente (nome)</label><input id="f-pac-ex" value="${d.pacientes?.nome||''}"/></div>
+      <div class="form-group"><label>Data da consulta</label><input type="date" id="f-data-cons" value="${d.data_consulta||''}"/></div>
+    </div>
+    <div class="form-grid full">
+      <div class="form-group"><label>Exames solicitados</label><textarea id="f-exames-sol">${d.exames_solicitados||''}</textarea></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Status envio</label><select id="f-st-env"><option value="aguardando" ${d.status_envio==='aguardando'?'selected':''}>Aguardando</option><option value="nao_enviou" ${d.status_envio==='nao_enviou'?'selected':''}>Não enviou</option><option value="parcial" ${d.status_envio==='parcial'?'selected':''}>Parcial</option><option value="completo" ${d.status_envio==='completo'?'selected':''}>Completo</option></select></div>
+      <div class="form-group"><label>Urgência</label><select id="f-urg"><option value="alta" ${d.urgencia==='alta'?'selected':''}>Alta</option><option value="media" ${d.urgencia==='media'?'selected':''}>Média</option><option value="baixa" ${d.urgencia==='baixa'?'selected':''}>Baixa</option></select></div>
+    </div>
+    <div class="form-grid full">
+      <div class="form-group"><label>Exames faltantes</label><input id="f-ex-falt" value="${d.exames_faltantes||''}"/></div>
+    </div>
+    <div class="form-grid full">
+      <div class="form-group"><label>Observações clínicas / achados</label><textarea id="f-obs-ex">${d.obs_clinicas||''}</textarea></div>
+    </div>`,
+
+  colaborador: (d={}) => `<h3>Colaborador</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Nome completo</label><input id="f-colab-nome" value="${d.nome||''}"/></div>
+      <div class="form-group"><label>CPF</label><input id="f-colab-cpf" value="${d.cpf||''}"/></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Cargo</label><input id="f-colab-cargo" value="${d.cargo||''}" placeholder="Ex: Secretária"/></div>
+      <div class="form-group"><label>Salário base (R$)</label><input type="number" id="f-colab-sal" value="${d.salario_base||''}"/></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Banco</label><input id="f-colab-banco" value="${d.banco||''}"/></div>
+      <div class="form-group"><label>Chave Pix</label><input id="f-colab-pix" value="${d.chave_pix||''}"/></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Data de admissão</label><input type="date" id="f-colab-adm" value="${d.data_admissao||''}"/></div>
+      <div class="form-group"><label>Status</label><select id="f-colab-ativo"><option value="true" ${d.ativo!==false?'selected':''}>Ativo</option><option value="false" ${d.ativo===false?'selected':''}>Inativo</option></select></div>
+    </div>
+    <div class="form-grid full">
+      <div class="form-group"><label>Observações</label><textarea id="f-colab-obs">${d.observacoes||''}</textarea></div>
+    </div>`,
+
+  salario: (colabId, d={}) => `<h3>Registrar pagamento de salário</h3>
+    <input type="hidden" id="f-colab-id" value="${colabId||''}"/>
+    <div class="form-grid">
+      <div class="form-group"><label>Competência</label><input id="f-sal-comp" value="${d.competencia||''}" placeholder="Ex: Maio/2025"/></div>
+      <div class="form-group"><label>Data de pagamento</label><input type="date" id="f-sal-data" value="${d.data_pagamento||''}"/></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Valor bruto (R$)</label><input type="number" id="f-sal-bruto" value="${d.valor_bruto||''}"/></div>
+      <div class="form-group"><label>Descontos (R$)</label><input type="number" id="f-sal-desc" value="${d.descontos||0}"/></div>
+    </div>
+    <div class="form-grid full">
+      <div class="form-group"><label>Valor líquido (R$)</label><input type="number" id="f-sal-liq" value="${d.valor_liquido||''}"/></div>
+    </div>
+    <div class="form-grid full">
+      <div class="form-group"><label>Observações</label><textarea id="f-sal-obs">${d.observacoes||''}</textarea></div>
+    </div>`,
+};
+
+let editingId = null;
+
+function openModal(type, extraId) {
+  currentModal = type;
+  editingId = null;
+  document.getElementById('modal-inner').innerHTML = modalForms[type]?.(extraId ? {id: extraId} : {}) || '';
+  document.getElementById('modal-bg').classList.add('open');
+}
+
+async function openModalEdit(type, id) {
+  currentModal = type;
+  editingId = id;
+  const tableMap = { agendamento:'agendamentos', paciente:'pacientes', programa:'programas', exame:'exames', colaborador:'colaboradores' };
+  const joinMap  = { agendamento:'*, pacientes(nome)', programa:'*, pacientes(nome), programa_consultas(*)', exame:'*, pacientes(nome)' };
+  const sel = joinMap[type] || '*';
+  const { data } = await sb.from(tableMap[type]).select(sel).eq('id',id).single();
+  document.getElementById('modal-inner').innerHTML = modalForms[type]?.(data||{}) || '';
+  document.getElementById('modal-bg').classList.add('open');
+}
+
+async function saveModal() {
+  const type = currentModal;
+
+  if (type === 'agendamento') {
+    const nomePac = document.getElementById('f-pac-nome')?.value?.trim();
+    let pacienteId = null;
+    if (nomePac) {
+      const { data: pac } = await sb.from('pacientes').select('id').ilike('nome', nomePac).single();
+      if (pac) pacienteId = pac.id;
+      else {
+        const { data: newPac } = await sb.from('pacientes').insert({nome: nomePac}).select().single();
+        pacienteId = newPac?.id;
+      }
+    }
+    const payload = {
+      paciente_id: pacienteId,
+      tipo: document.getElementById('f-tipo-ag')?.value,
+      data_hora: document.getElementById('f-data-hora')?.value,
+      valor: document.getElementById('f-valor')?.value || null,
+      forma_pagamento: document.getElementById('f-forma-pag')?.value || null,
+      data_pagamento: document.getElementById('f-data-pag')?.value || null,
+      nf_status: document.getElementById('f-nf-status')?.value,
+      nf_numero: document.getElementById('f-nf-num')?.value || null,
+      status: document.getElementById('f-status-ag')?.value,
+      observacoes: document.getElementById('f-obs')?.value || null,
+    };
+    if (editingId) await sb.from('agendamentos').update(payload).eq('id', editingId);
+    else await sb.from('agendamentos').insert(payload);
+  }
+
+  else if (type === 'paciente') {
+    const payload = {
+      nome: document.getElementById('f-nome')?.value,
+      data_nascimento: document.getElementById('f-nasc')?.value || null,
+      telefone: document.getElementById('f-tel')?.value || null,
+      email: document.getElementById('f-email-pac')?.value || null,
+      diagnostico: document.getElementById('f-diag')?.value || null,
+      medicacao: document.getElementById('f-med')?.value || null,
+      observacoes: document.getElementById('f-obs-pac')?.value || null,
+    };
+    if (editingId) await sb.from('pacientes').update(payload).eq('id', editingId);
+    else await sb.from('pacientes').insert(payload);
+  }
+
+  else if (type === 'programa') {
+    const nomePac = document.getElementById('f-pac-prog')?.value?.trim();
+    let pacienteId = null;
+    if (nomePac) {
+      const { data: pac } = await sb.from('pacientes').select('id').ilike('nome', nomePac).single();
+      pacienteId = pac?.id;
+    }
+    const payload = {
+      paciente_id: pacienteId,
+      tipo: document.getElementById('f-tipo-prog')?.value,
+      total_consultas: document.getElementById('f-total-cons')?.value || 6,
+      valor_total: document.getElementById('f-val-prog')?.value || null,
+      forma_pagamento: document.getElementById('f-forma-prog')?.value || null,
+      data_inicio: document.getElementById('f-inicio-prog')?.value || null,
+      status: document.getElementById('f-st-prog')?.value,
+    };
+    if (editingId) await sb.from('programas').update(payload).eq('id', editingId);
+    else await sb.from('programas').insert(payload);
+  }
+
+  else if (type === 'exame') {
+    const nomePac = document.getElementById('f-pac-ex')?.value?.trim();
+    let pacienteId = null;
+    if (nomePac) {
+      const { data: pac } = await sb.from('pacientes').select('id').ilike('nome', nomePac).single();
+      pacienteId = pac?.id;
+    }
+    const payload = {
+      paciente_id: pacienteId,
+      data_consulta: document.getElementById('f-data-cons')?.value || null,
+      exames_solicitados: document.getElementById('f-exames-sol')?.value || null,
+      status_envio: document.getElementById('f-st-env')?.value,
+      urgencia: document.getElementById('f-urg')?.value,
+      exames_faltantes: document.getElementById('f-ex-falt')?.value || null,
+      obs_clinicas: document.getElementById('f-obs-ex')?.value || null,
+    };
+    if (editingId) await sb.from('exames').update(payload).eq('id', editingId);
+    else await sb.from('exames').insert(payload);
+  }
+
+  else if (type === 'colaborador') {
+    const payload = {
+      nome: document.getElementById('f-colab-nome')?.value,
+      cpf: document.getElementById('f-colab-cpf')?.value || null,
+      cargo: document.getElementById('f-colab-cargo')?.value || null,
+      salario_base: document.getElementById('f-colab-sal')?.value || null,
+      banco: document.getElementById('f-colab-banco')?.value || null,
+      chave_pix: document.getElementById('f-colab-pix')?.value || null,
+      data_admissao: document.getElementById('f-colab-adm')?.value || null,
+      ativo: document.getElementById('f-colab-ativo')?.value === 'true',
+      observacoes: document.getElementById('f-colab-obs')?.value || null,
+    };
+    if (editingId) await sb.from('colaboradores').update(payload).eq('id', editingId);
+    else await sb.from('colaboradores').insert(payload);
+  }
+
+  else if (type === 'salario') {
+    const colabId = document.getElementById('f-colab-id')?.value;
+    const payload = {
+      colaborador_id: colabId,
+      competencia: document.getElementById('f-sal-comp')?.value || null,
+      data_pagamento: document.getElementById('f-sal-data')?.value || null,
+      valor_bruto: document.getElementById('f-sal-bruto')?.value || null,
+      descontos: document.getElementById('f-sal-desc')?.value || 0,
+      valor_liquido: document.getElementById('f-sal-liq')?.value || null,
+      observacoes: document.getElementById('f-sal-obs')?.value || null,
+    };
+    await sb.from('pagamentos_salario').insert(payload);
+  }
+
+  closeModal();
+  const reloaders = { agendamento: ()=>{loadAgenda();loadAgendamentos();}, paciente: loadPacientes,
+    programa: loadProgramas, exame: loadExames, colaborador: loadRH, salario: loadRH };
+  reloaders[type]?.();
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modal-bg')) {
+    document.getElementById('modal-bg').classList.remove('open');
+    editingId = null; currentModal = null;
+  }
+}
+</script>
+</body>
+</html>
