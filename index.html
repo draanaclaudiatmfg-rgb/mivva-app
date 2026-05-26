@@ -642,6 +642,7 @@ async function renderLista(){
         </div>
         ${tipoBadge(a.tipo)}
         ${a.pacientes?.telefone?`<button class="btn-sm whatsapp" onclick="event.stopPropagation();abrirWhatsApp('${a.pacientes.telefone}','${a.pacientes.nome}','${a.data_hora}','')">📱</button>`:''}
+        <button class="btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #F09595;" onclick="event.stopPropagation();excluirAgendamento('${a.id}')">🗑</button>
       </div>`;
     });
   });
@@ -688,7 +689,7 @@ async function loadAgendamentos(){
     <td><span class="badge ${a.nf_status==='emitida'?'bg-green':'bg-amber'}">${a.nf_status||'pendente'}</span>${a.nf_numero?' Nº'+a.nf_numero:''}</td>
     <td>${statusBadge(a.status)}</td>
     <td>${a.pacientes?.telefone?`<button class="btn-sm whatsapp" onclick="abrirWhatsApp('${a.pacientes.telefone}','${a.pacientes.nome}','${a.data_hora}','')">📱</button>`:'—'}</td>
-    <td><button class="btn-sm" onclick="openModalEdit('agendamento','${a.id}')">Editar</button></td>
+    <td style="white-space:nowrap"><button class="btn-sm" onclick="openModalEdit('agendamento','${a.id}')">Editar</button> <button class="btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #F09595;" onclick="excluirAgendamento('${a.id}')">🗑</button></td>
   </tr>`).join('');
 }
 
@@ -943,6 +944,15 @@ async function loadDashboard(){
 }
 
 // ── WHATSAPP ──────────────────────────────────────────────────
+async function excluirAgendamento(id) {
+  if (!confirm('Excluir este agendamento? Esta ação não pode ser desfeita.')) return;
+  const { error } = await sb.from('agendamentos').delete().eq('id', id);
+  if (error) { alert('Erro ao excluir: ' + error.message); return; }
+  closeModal();
+  loadAgenda();
+  loadAgendamentos();
+}
+
 function abrirWhatsApp(tel,nome,dataHora,exames){
   const t=tel?.replace(/\D/g,'');
   if(!t){alert('Telefone não cadastrado.');return;}
@@ -1000,7 +1010,8 @@ const modalForms={
       <div class="form-group"><label>Nº NF</label><input id="f-nf-num" value="${d.nf_numero||''}"/></div>
     </div>
     <div class="form-grid full"><div class="form-group"><label>Status</label><select id="f-status-ag"><option value="agendada" ${d.status==='agendada'?'selected':''}>Agendada</option><option value="realizada" ${d.status==='realizada'?'selected':''}>Realizada</option><option value="cancelada" ${d.status==='cancelada'?'selected':''}>Cancelada</option><option value="remarcada" ${d.status==='remarcada'?'selected':''}>Remarcada</option></select></div></div>
-    <div class="form-grid full"><div class="form-group"><label>Observações</label><textarea id="f-obs">${d.observacoes||''}</textarea></div></div>`,
+    <div class="form-grid full"><div class="form-group"><label>Observações</label><textarea id="f-obs">${d.observacoes||''}</textarea></div></div>
+    ${d.id?`<div style="margin-top:8px;padding-top:12px;border-top:1px solid var(--border)"><button onclick="excluirAgendamento('${d.id}')" style="background:none;border:1px solid var(--red);color:var(--red);padding:7px 14px;border-radius:var(--radius);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;">🗑 Excluir agendamento</button></div>`:''}`,
 
   paciente:(d={})=>`<h3>${d.id?'Editar paciente':'Nova paciente'}</h3>
     <div class="form-grid">
