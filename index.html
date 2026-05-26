@@ -468,10 +468,17 @@ function acInput(inputId,listId,onSelect){
       const{data}=await sb.from('pacientes').select('id,nome,telefone,email,diagnostico,medicacao,periodicidade_dias').ilike('nome','%'+q+'%').order('nome').limit(8);
       if(!data?.length)return;
       list.style.display='block';
-      list.innerHTML=data.map(p=>`<div class="autocomplete-item" data-id="${p.id}" onclick="acSelect('${inputId}','${listId}',${JSON.stringify(p).replace(/'/g,"&#39;")},acCb_${inputId})">
+      list.innerHTML=data.map(p=>`<div class="autocomplete-item" data-pac='${JSON.stringify(p).replace(/'/g,"&#39;")}'>
         <div class="ac-name">${p.nome}</div>
         <div class="ac-detail">${p.telefone||''} ${p.diagnostico?'· '+p.diagnostico:''}</div>
       </div>`).join('');
+    // adicionar listeners após renderizar
+    list.querySelectorAll('.autocomplete-item').forEach(item=>{
+      item.addEventListener('mousedown',e=>{
+        e.preventDefault();
+        try{const pac=JSON.parse(item.dataset.pac);acSelect(inputId,listId,pac);}catch(err){console.error(err);}
+      });
+    });
     },200);
   });
   document.addEventListener('click',e=>{if(!e.target.closest('.autocomplete-wrap')){list.style.display='none';}});
@@ -790,43 +797,49 @@ function handleDrop(e) {
 
 async function uploadExames(files) {
   const bar = document.getElementById('upload-bar');
-  const exId = editingId || currentExameId;
-  const pacNome = document.getElementById('f-pac-ex')?.value?.trim() || 'paciente';
+  const pacNome = (document.getElementById('f-pac-ex')?.value?.trim() || 'geral').replace(/[^a-zA-Z0-9 ]/g,'').replace(/\s+/g,'_');
   let done = 0;
+  const list = document.getElementById('pdf-list');
+  if(list) list.innerHTML = '<div style="font-size:12px;color:var(--muted)">Enviando...</div>';
 
   for (const file of files) {
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `${pacNome.replace(/\s+/g,'_')}/${Date.now()}_${safeName}`;
-    const { error } = await sb.storage.from('exames').upload(path, file, { upsert: true });
-    if (!error) {
+    const path = `${pacNome}/${Date.now()}_${safeName}`;
+    const { data: upData, error } = await sb.storage.from('exames').upload(path, file, { upsert: true });
+    if (error) {
+      console.error('Upload error:', error);
+      if(list) list.innerHTML += `<div style="color:var(--red);font-size:12px">Erro ao enviar ${file.name}: ${error.message}</div>`;
+    } else {
       done++;
       if (bar) bar.style.width = (done / files.length * 100) + '%';
     }
   }
 
   setTimeout(() => { if (bar) bar.style.width = '0%'; }, 1000);
-
-  // salvar referência no banco se tiver id
-  if (exId) await carregarPDFs(exId, pacNome);
+  await carregarPDFs(null, pacNome.replace(/_/g,' '));
 }
 
 async function carregarPDFs(exameId, pacNome) {
   const list = document.getElementById('pdf-list');
   if (!list) return;
-  if (!pacNome) {
-    // buscar nome pelo id
+  if (!pacNome && exameId) {
     const { data } = await sb.from('exames').select('pacientes(nome)').eq('id', exameId).single();
     pacNome = data?.pacientes?.nome || '';
   }
-  const folder = pacNome.replace(/\s+/g, '_');
-  const { data: files } = await sb.storage.from('exames').list(folder, { limit: 50, sortBy: { column: 'created_at', order: 'desc' } });
-  if (!files?.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted)">Nenhum arquivo enviado ainda.</div>'; return; }
-  list.innerHTML = files.map(f => {
+  if (!pacNome) { list.innerHTML = '<div style="font-size:12px;color:var(--muted)">Selecione uma paciente para ver os arquivos.</div>'; return; }
+  const folder = pacNome.replace(/[^a-zA-Z0-9 ]/g,'').replace(/\s+/g, '_');
+  const { data: files, error } = await sb.storage.from('exames').list(folder, { limit: 50 });
+  if (error || !files?.length) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--muted)">Nenhum arquivo enviado ainda.</div>';
+    return;
+  }
+  list.innerHTML = files.filter(f=>f.name).map(f => {
     const { data: urlData } = sb.storage.from('exames').getPublicUrl(folder + '/' + f.name);
     const kb = f.metadata?.size ? Math.round(f.metadata.size / 1024) + ' KB' : '';
+    const isImg = /\.(jpg|jpeg|png|gif)$/i.test(f.name);
     return `<div class="pdf-item">
       <div>
-        <a href="${urlData.publicUrl}" target="_blank">📄 ${f.name}</a>
+        <a href="${urlData.publicUrl}" target="_blank">${isImg?'🖼':'📄'} ${f.name}</a>
         <div class="pdf-meta">${kb}</div>
       </div>
       <button class="btn-del" onclick="deletePDF('${folder}','${f.name}')" title="Remover">🗑</button>
