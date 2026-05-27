@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
-  const apiKey = process.env.ANTHROPIC_KEY;
+  const apiKey = process.env.Anthropic_key;
   if (!apiKey) { res.status(500).json({ error: 'API key not configured' }); return; }
 
   try {
