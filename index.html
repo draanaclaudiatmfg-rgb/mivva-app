@@ -205,6 +205,13 @@ tr:hover td{background:var(--bg2);}
 .side-panel-detail{font-size:12px;color:var(--muted);margin-bottom:16px;}
 .side-panel-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:299;}
 .side-panel-overlay.open{display:block;}
+
+/* LEADS */
+.followup-alert{background:var(--red-bg);border:1px solid #F09595;border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;}
+.followup-alert-title{font-size:13px;font-weight:500;color:var(--red);margin-bottom:8px;}
+.followup-item{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(163,45,45,0.1);font-size:13px;}
+.followup-item:last-child{border-bottom:none;}
+.followup-days{font-size:11px;background:var(--red);color:#fff;padding:2px 6px;border-radius:20px;margin-left:8px;}
 .empty{text-align:center;padding:48px 20px;color:var(--muted);}
 .empty-icon{font-size:32px;margin-bottom:12px;opacity:0.4;}
 .loading{text-align:center;padding:40px;color:var(--muted);}
@@ -269,6 +276,7 @@ tr:hover td{background:var(--bg2);}
     <button class="nav-btn" onclick="switchTab('pacientes')" id="nav-pacientes">👩 Pacientes</button>
     <button class="nav-btn fin-only" onclick="switchTab('rh')" id="nav-rh">👥 RH & Salários</button>
     <button class="nav-btn fin-only" onclick="switchTab('dashboard')" id="nav-dashboard">📊 Dashboard</button>
+    <button class="nav-btn fin-only" onclick="switchTab('leads')" id="nav-leads">🎯 Leads</button>
   </div>
 
   <div class="content">
@@ -369,7 +377,103 @@ tr:hover td{background:var(--bg2);}
       <div class="sec-header"><h2>Colaboradores & Salários</h2><button class="btn-primary" onclick="openModal('colaborador')">+ Novo</button></div>
       <div id="colab-list"><div class="loading">Carregando...</div></div>
     </div>
+
+    <!-- LEADS -->
+    <div class="tab-pane" id="tab-leads">
+      <div class="sec-header">
+        <h2>Gestão de Leads</h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div style="display:flex;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+            <button class="cal-view-btn active" id="leads-view-semana" onclick="setLeadsView('semana')">Semana</button>
+            <button class="cal-view-btn" id="leads-view-mes" onclick="setLeadsView('mes')">Mês</button>
+            <button class="cal-view-btn" id="leads-view-todos" onclick="setLeadsView('todos')">Todos</button>
+          </div>
+          <button class="btn-primary" onclick="openModal('lead')">+ Novo lead</button>
+        </div>
+      </div>
+
+      <!-- Métricas -->
+      <div class="metrics" id="leads-metrics">
+        <div class="metric"><div class="metric-label">Total leads</div><div class="metric-value" id="lm-total">—</div></div>
+        <div class="metric"><div class="metric-label">Consultaram</div><div class="metric-value green" id="lm-convertidos">—</div></div>
+        <div class="metric"><div class="metric-label">Em andamento</div><div class="metric-value amber" id="lm-andamento">—</div></div>
+        <div class="metric"><div class="metric-label">Follow up hoje</div><div class="metric-value red" id="lm-followup">—</div></div>
+        <div class="metric" style="background:var(--pale)">
+          <div class="metric-label">Taxa de conversão</div>
+          <div class="metric-value" id="lm-taxa" style="color:var(--pm)">—</div>
+        </div>
+      </div>
+
+      <!-- Follow ups urgentes -->
+      <div id="leads-followup-urgente"></div>
+
+      <!-- Tabela -->
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Data entrada</th>
+            <th>Nome</th>
+            <th>Origem</th>
+            <th>Interesse</th>
+            <th>Status</th>
+            <th>Follow up</th>
+            <th>WhatsApp</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="leads-body"><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- DASHBOARD -->
+
+    <!-- LEADS -->
+    <div class="tab-pane" id="tab-leads">
+      <div class="sec-header">
+        <h2>Gestão de Leads</h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div style="display:flex;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+            <button class="cal-view-btn active" id="leads-view-semana" onclick="setLeadsView('semana')">Semana</button>
+            <button class="cal-view-btn" id="leads-view-mes" onclick="setLeadsView('mes')">Mês</button>
+            <button class="cal-view-btn" id="leads-view-todos" onclick="setLeadsView('todos')">Todos</button>
+          </div>
+          <button class="btn-primary" onclick="openModal('lead')">+ Novo lead</button>
+        </div>
+      </div>
+
+      <!-- Métricas -->
+      <div class="metrics" id="leads-metrics">
+        <div class="metric"><div class="metric-label">Total leads</div><div class="metric-value" id="lm-total">—</div></div>
+        <div class="metric"><div class="metric-label">Consultaram</div><div class="metric-value green" id="lm-convertidos">—</div></div>
+        <div class="metric"><div class="metric-label">Em andamento</div><div class="metric-value amber" id="lm-andamento">—</div></div>
+        <div class="metric"><div class="metric-label">Follow up hoje</div><div class="metric-value red" id="lm-followup">—</div></div>
+        <div class="metric" style="background:var(--pale)">
+          <div class="metric-label">Taxa de conversão</div>
+          <div class="metric-value" id="lm-taxa" style="color:var(--pm)">—</div>
+        </div>
+      </div>
+
+      <!-- Follow ups urgentes -->
+      <div id="leads-followup-urgente"></div>
+
+      <!-- Tabela -->
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Data entrada</th>
+            <th>Nome</th>
+            <th>Origem</th>
+            <th>Interesse</th>
+            <th>Status</th>
+            <th>Follow up</th>
+            <th>WhatsApp</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="leads-body"><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- DASHBOARD -->
     <div class="tab-pane" id="tab-dashboard">
       <div class="sec-header"><h2>Dashboard Financeiro</h2>
@@ -469,7 +573,7 @@ function switchTab(id){
   document.getElementById('nav-'+id)?.classList.add('active');
   document.getElementById('tab-'+id)?.classList.add('active');
   const L={agenda:loadAgenda,agendamentos:loadAgendamentos,programas:loadProgramas,
-    financeiro:loadFinanceiro,exames:loadExames,pacientes:loadPacientes,rh:loadRH,dashboard:loadDashboard};
+    financeiro:loadFinanceiro,exames:loadExames,pacientes:loadPacientes,rh:loadRH,dashboard:loadDashboard,leads:loadLeads};
   L[id]?.();
 }
 
@@ -722,7 +826,7 @@ async function loadAgendamentos(){
     <td>${fmtR(a.valor)}</td>
     <td><span class="badge ${a.nf_status==='emitida'?'bg-green':'bg-amber'}">${a.nf_status||'pendente'}</span>${a.nf_numero?' Nº'+a.nf_numero:''}</td>
     <td>${statusBadge(a.status)}</td>
-    <td><button class="btn-sm outline" onclick="abrirSidePanel('${a.pacientes?.nome||''}','${a.pacientes?.diagnostico||''}','${a.data_hora}')">📎</button></td>
+    <td style="text-align:center"><button class="btn-sm outline" onclick="abrirSidePanel('${a.pacientes?.nome||''}','${a.pacientes?.diagnostico||''}','${a.data_hora}')" title="Ver exames">📎</button></td>
     <td>${a.pacientes?.telefone?`<button class="btn-sm whatsapp" onclick="abrirWhatsApp('${a.pacientes.telefone}','${a.pacientes.nome}','${a.data_hora}','')">📱</button>`:'—'}</td>
     <td style="white-space:nowrap"><button class="btn-sm" onclick="openModalEdit('agendamento','${a.id}')">Editar</button> <button class="btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #F09595;" onclick="excluirAgendamento('${a.id}')">🗑</button></td>
   </tr>`).join('');
@@ -980,6 +1084,117 @@ async function loadDashboard(){
 
 // ── WHATSAPP ──────────────────────────────────────────────────
 
+
+// ── LEADS ─────────────────────────────────────────────────────
+let leadsView = 'semana';
+
+function setLeadsView(v) {
+  leadsView = v;
+  document.querySelectorAll('[id^="leads-view-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('leads-view-' + v)?.classList.add('active');
+  loadLeads();
+}
+
+async function loadLeads() {
+  let q = sb.from('leads').select('*').order('created_at', { ascending: false });
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  if (leadsView === 'semana') {
+    const start = new Date(hoje); start.setDate(hoje.getDate() - hoje.getDay());
+    const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23,59,59,999);
+    q = q.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+  } else if (leadsView === 'mes') {
+    const start = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const end = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0); end.setHours(23,59,59,999);
+    q = q.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+  }
+
+  const { data } = await q.limit(200);
+  const leads = data || [];
+
+  // Métricas
+  const total = leads.length;
+  const convertidos = leads.filter(l => l.status === 'convertido').length;
+  const agendados = leads.filter(l => l.status === 'agendado').length;
+  const andamento = leads.filter(l => ['novo','em_contato'].includes(l.status)).length;
+  const taxa = total ? Math.round((convertidos / total) * 100) : 0;
+
+  // Follow ups vencidos/hoje
+  const followupHoje = leads.filter(l => {
+    if (!l.followup_data) return false;
+    const fd = new Date(l.followup_data); fd.setHours(0,0,0,0);
+    return fd <= hoje && !['convertido','perdido'].includes(l.status);
+  });
+
+  document.getElementById('lm-total').textContent = total;
+  document.getElementById('lm-convertidos').textContent = convertidos + agendados;
+  document.getElementById('lm-andamento').textContent = andamento;
+  document.getElementById('lm-followup').textContent = followupHoje.length;
+  document.getElementById('lm-taxa').textContent = taxa + '%';
+
+  // Alertas de follow up
+  const alertDiv = document.getElementById('leads-followup-urgente');
+  if (followupHoje.length) {
+    alertDiv.innerHTML = `<div class="followup-alert">
+      <div class="followup-alert-title">⚠️ ${followupHoje.length} lead(s) precisam de follow up hoje ou estão atrasados</div>
+      ${followupHoje.map(l => {
+        const dias = Math.floor((hoje - new Date(l.followup_data)) / 86400000);
+        return `<div class="followup-item">
+          <span>${l.nome} · ${l.interesse || '—'}</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="followup-days">${dias === 0 ? 'hoje' : dias + 'd atraso'}</span>
+            ${l.telefone ? `<button class="btn-sm whatsapp" onclick="abrirWhatsAppLead('${l.telefone}','${l.nome}')">📱</button>` : ''}
+            <button class="btn-sm" onclick="openModalEdit('lead','${l.id}')">Ver</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  } else {
+    alertDiv.innerHTML = '';
+  }
+
+  // Tabela
+  const body = document.getElementById('leads-body');
+  if (!leads.length) { body.innerHTML = '<tr><td colspan="8" class="empty">Nenhum lead encontrado.</td></tr>'; return; }
+
+  const statusMap = {
+    novo: ['bg-gray','Novo'],
+    em_contato: ['bg-amber','Em contato'],
+    agendado: ['bg-blue','Agendou'],
+    convertido: ['bg-green','Convertido ✓'],
+    perdido: ['bg-red','Perdido']
+  };
+
+  body.innerHTML = leads.map(l => {
+    const [sCls, sLabel] = statusMap[l.status] || ['bg-gray', l.status];
+    const fdStr = l.followup_data ? fmt(l.followup_data) : '—';
+    const fdVencido = l.followup_data && new Date(l.followup_data) <= hoje && !['convertido','perdido'].includes(l.status);
+    return `<tr ${fdVencido ? 'style="background:rgba(252,235,235,0.3)"' : ''}>
+      <td>${fmt(l.created_at)}</td>
+      <td style="font-weight:500">${l.nome}</td>
+      <td><span class="badge bg-gray">${l.origem || '—'}</span></td>
+      <td>${l.interesse || '—'}</td>
+      <td><span class="badge ${sCls}">${sLabel}</span></td>
+      <td style="color:${fdVencido ? 'var(--red)' : 'inherit'};font-weight:${fdVencido ? '500' : '400'}">${fdStr}${fdVencido ? ' ⚠️' : ''}</td>
+      <td>${l.telefone ? `<button class="btn-sm whatsapp" onclick="abrirWhatsAppLead('${l.telefone}','${l.nome}')">📱</button>` : '—'}</td>
+      <td><button class="btn-sm" onclick="openModalEdit('lead','${l.id}')">Editar</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function abrirWhatsAppLead(tel, nome) {
+  const t = tel?.replace(/\D/g,'');
+  if (!t) return;
+  const msg = `Olá, ${nome}! 😊\n\nPassando para saber se você ainda tem interesse em agendar uma consulta na *Mivva Clínica*. Ficamos à disposição para tirar qualquer dúvida! 💜`;
+  window.open(`https://wa.me/55${t}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+async function excluirLead(id) {
+  if (!confirm('Excluir este lead?')) return;
+  await sb.from('leads').delete().eq('id', id);
+  closeModal();
+  loadLeads();
+}
+
 // ── PAINEL LATERAL EXAMES ─────────────────────────────────────
 let spPacNome = '';
 
@@ -1189,6 +1404,33 @@ const modalForms={
     </div>
     <div class="form-grid full"><div class="form-group"><label>Observações</label><textarea id="f-colab-obs">${d.observacoes||''}</textarea></div></div>`,
 
+  lead:(d={})=>`<h3>${d.id?'Editar lead':'Novo lead'}</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Nome</label><input id="f-lead-nome" value="${d.nome||''}"/></div>
+      <div class="form-group"><label>Telefone / WhatsApp</label><input id="f-lead-tel" value="${d.telefone||''}" placeholder="11999998888"/></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Origem</label><select id="f-lead-origem"><option value="Instagram" ${d.origem==='Instagram'?'selected':''}>Instagram</option><option value="Indicação" ${d.origem==='Indicação'?'selected':''}>Indicação</option><option value="WhatsApp" ${d.origem==='WhatsApp'?'selected':''}>WhatsApp</option><option value="Site" ${d.origem==='Site'?'selected':''}>Site</option><option value="Google" ${d.origem==='Google'?'selected':''}>Google</option><option value="Outro" ${d.origem==='Outro'?'selected':''}>Outro</option></select></div>
+      <div class="form-group"><label>Interesse</label><select id="f-lead-interesse"><option value="Sinfonia" ${d.interesse==='Sinfonia'?'selected':''}>Sinfonia</option><option value="Consulta avulsa" ${d.interesse==='Consulta avulsa'?'selected':''}>Consulta avulsa</option><option value="Lipedema" ${d.interesse==='Lipedema'?'selected':''}>Lipedema</option><option value="Menopausa" ${d.interesse==='Menopausa'?'selected':''}>Menopausa</option><option value="Emagrecimento" ${d.interesse==='Emagrecimento'?'selected':''}>Emagrecimento</option><option value="Outro" ${d.interesse==='Outro'?'selected':''}>Outro</option></select></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Status</label><select id="f-lead-status">
+        <option value="novo" ${d.status==='novo'?'selected':''}>Novo</option>
+        <option value="em_contato" ${d.status==='em_contato'?'selected':''}>Em contato</option>
+        <option value="agendado" ${d.status==='agendado'?'selected':''}>Agendou consulta</option>
+        <option value="convertido" ${d.status==='convertido'?'selected':''}>Convertido ✓</option>
+        <option value="perdido" ${d.status==='perdido'?'selected':''}>Perdido</option>
+      </select></div>
+      <div class="form-group"><label>Follow up em</label><select id="f-lead-followup">
+        <option value="">Sem follow up</option>
+        <option value="3">3 dias</option>
+        <option value="5">5 dias</option>
+        <option value="7">7 dias</option>
+      </select></div>
+    </div>
+    <div class="form-grid full"><div class="form-group"><label>Observações</label><textarea id="f-lead-obs">${d.observacoes||''}</textarea></div></div>
+    ${d.id?`<div style="margin-top:8px;padding-top:12px;border-top:1px solid var(--border)"><button onclick="excluirLead('${d.id}')" style="background:none;border:1px solid var(--red);color:var(--red);padding:7px 14px;border-radius:var(--radius);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;">🗑 Excluir lead</button></div>`:''}`,
+
   salario:(colabId,d={})=>`<h3>Pagamento de salário</h3>
     <input type="hidden" id="f-colab-id" value="${colabId||''}"/>
     <div class="form-grid">
@@ -1273,6 +1515,26 @@ async function saveModal(){
     if(editingId)await sb.from('exames').update(payload).eq('id',editingId);
     else await sb.from('exames').insert(payload);
   }
+  else if(type==='lead'){
+    const followupDias = document.getElementById('f-lead-followup')?.value;
+    let followupData = null;
+    if (followupDias) {
+      const d = new Date();
+      d.setDate(d.getDate() + parseInt(followupDias));
+      followupData = d.toISOString().split('T')[0];
+    }
+    const payload = {
+      nome: document.getElementById('f-lead-nome')?.value,
+      telefone: document.getElementById('f-lead-tel')?.value || null,
+      origem: document.getElementById('f-lead-origem')?.value || null,
+      interesse: document.getElementById('f-lead-interesse')?.value || null,
+      status: document.getElementById('f-lead-status')?.value || 'novo',
+      followup_data: followupData,
+      observacoes: document.getElementById('f-lead-obs')?.value || null,
+    };
+    if (editingId) await sb.from('leads').update(payload).eq('id', editingId);
+    else await sb.from('leads').insert(payload);
+  }
   else if(type==='colaborador'){
     const payload={nome:document.getElementById('f-colab-nome')?.value,cargo:document.getElementById('f-colab-cargo')?.value||null,salario_base:document.getElementById('f-colab-sal')?.value||null,banco:document.getElementById('f-colab-banco')?.value||null,chave_pix:document.getElementById('f-colab-pix')?.value||null,data_admissao:document.getElementById('f-colab-adm')?.value||null,observacoes:document.getElementById('f-colab-obs')?.value||null};
     if(editingId)await sb.from('colaboradores').update(payload).eq('id',editingId);
@@ -1284,7 +1546,7 @@ async function saveModal(){
   }
 
   closeModal();
-  const R={agendamento:()=>{loadAgenda();loadAgendamentos();loadNotificacoes();},paciente:()=>{loadPacientes();loadNotificacoes();},programa:loadProgramas,exame:loadExames,colaborador:loadRH,salario:loadRH};
+  const R={agendamento:()=>{loadAgenda();loadAgendamentos();loadNotificacoes();},paciente:()=>{loadPacientes();loadNotificacoes();},programa:loadProgramas,exame:loadExames,colaborador:loadRH,salario:loadRH,lead:loadLeads};
   R[type]?.();
 }
 
