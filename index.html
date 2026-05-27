@@ -256,7 +256,6 @@ tr:hover td{background:var(--bg2);}
     <button class="nav-btn" onclick="switchTab('pacientes')" id="nav-pacientes">👩 Pacientes</button>
     <button class="nav-btn fin-only" onclick="switchTab('rh')" id="nav-rh">👥 RH & Salários</button>
     <button class="nav-btn fin-only" onclick="switchTab('dashboard')" id="nav-dashboard">📊 Dashboard</button>
-    <button class="nav-btn" onclick="switchTab('transcricao')" id="nav-transcricao">🔬 Transcrição IA</button>
   </div>
 
   <div class="content">
@@ -357,63 +356,6 @@ tr:hover td{background:var(--bg2);}
       <div class="sec-header"><h2>Colaboradores & Salários</h2><button class="btn-primary" onclick="openModal('colaborador')">+ Novo</button></div>
       <div id="colab-list"><div class="loading">Carregando...</div></div>
     </div>
-
-    <!-- TRANSCRIÇÃO IA -->
-    <div class="tab-pane" id="tab-transcricao">
-      <div class="sec-header">
-        <h2>Transcrição de Exames com IA</h2>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-        <!-- Upload e transcrição -->
-        <div>
-          <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
-            <h3 style="font-size:16px;font-weight:400;color:var(--p);margin-bottom:16px;">📎 Enviar exame para transcrição</h3>
-            <div class="form-group autocomplete-wrap" style="margin-bottom:12px;">
-              <label>Paciente</label>
-              <input id="tr-pac-nome" placeholder="Digite o nome..." autocomplete="off"/>
-              <div class="autocomplete-list" id="ac-list-tr" style="display:none"></div>
-            </div>
-            <div class="form-group" style="margin-bottom:12px;">
-              <label>Tipo de exame</label>
-              <select id="tr-tipo">
-                <option value="laboratorial">Laboratorial (sangue, urina, etc.)</option>
-                <option value="imagem">Imagem (ultrassom, TC, RM)</option>
-                <option value="bioimpedancia">Bioimpedância</option>
-                <option value="outro">Outro</option>
-              </select>
-            </div>
-            <div class="upload-area" id="tr-upload-area" onclick="document.getElementById('tr-pdf-input').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDropTranscricao(event)">
-              <input type="file" id="tr-pdf-input" accept=".pdf,image/*" onchange="transcreverExame(this.files[0])"/>
-              <div class="upload-icon">🤖</div>
-              <div style="font-size:13px;font-weight:500;color:var(--p);margin-top:4px">Clique ou arraste o PDF/imagem aqui</div>
-              <p>A IA vai ler e transcrever automaticamente</p>
-            </div>
-            <div id="tr-status" style="margin-top:12px;font-size:13px;color:var(--muted);"></div>
-          </div>
-        </div>
-        <!-- Resultado -->
-        <div>
-          <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px;min-height:300px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-              <h3 style="font-size:16px;font-weight:400;color:var(--p);">📋 Transcrição</h3>
-              <div style="display:flex;gap:8px;">
-                <button class="btn-sm outline" onclick="copiarTranscricao()" id="btn-copiar" style="display:none">📋 Copiar</button>
-                <button class="btn-sm" onclick="salvarTranscricao()" id="btn-salvar" style="display:none">💾 Salvar no perfil</button>
-              </div>
-            </div>
-            <div id="tr-resultado" style="font-size:13px;color:var(--muted);line-height:1.8;white-space:pre-wrap;min-height:200px;">
-              O resultado da transcrição aparecerá aqui...
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- Histórico de transcrições -->
-      <div style="margin-top:20px;background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
-        <h3 style="font-size:16px;font-weight:400;color:var(--p);margin-bottom:16px;">📚 Histórico de transcrições</h3>
-        <div id="tr-historico"><div class="loading">Carregando...</div></div>
-      </div>
-    </div>
-
     <!-- DASHBOARD -->
     <!-- DASHBOARD -->
     <div class="tab-pane" id="tab-dashboard">
@@ -493,7 +435,7 @@ function switchTab(id){
   document.getElementById('nav-'+id)?.classList.add('active');
   document.getElementById('tab-'+id)?.classList.add('active');
   const L={agenda:loadAgenda,agendamentos:loadAgendamentos,programas:loadProgramas,
-    financeiro:loadFinanceiro,exames:loadExames,pacientes:loadPacientes,rh:loadRH,dashboard:loadDashboard,transcricao:loadTranscricao};
+    financeiro:loadFinanceiro,exames:loadExames,pacientes:loadPacientes,rh:loadRH,dashboard:loadDashboard};
   L[id]?.();
 }
 
@@ -1250,130 +1192,6 @@ async function saveModal(){
   closeModal();
   const R={agendamento:()=>{loadAgenda();loadAgendamentos();loadNotificacoes();},paciente:()=>{loadPacientes();loadNotificacoes();},programa:loadProgramas,exame:loadExames,colaborador:loadRH,salario:loadRH};
   R[type]?.();
-}
-
-// ── TRANSCRIÇÃO COM IA ────────────────────────────────────────
-let trPacienteId = null;
-let trTranscricaoAtual = '';
-
-function handleDropTranscricao(e) {
-  e.preventDefault();
-  document.getElementById('tr-upload-area')?.classList.remove('drag');
-  const file = e.dataTransfer.files[0];
-  if (file) transcreverExame(file);
-}
-
-async function transcreverExame(file) {
-  if (!file) return;
-  const status = document.getElementById('tr-status');
-  const resultado = document.getElementById('tr-resultado');
-  const btnCopiar = document.getElementById('btn-copiar');
-  const btnSalvar = document.getElementById('btn-salvar');
-
-  status.innerHTML = '<span style="color:var(--pm)">⏳ Lendo o exame com IA... aguarde alguns segundos...</span>';
-  resultado.textContent = '';
-  btnCopiar.style.display = 'none';
-  btnSalvar.style.display = 'none';
-
-  const tipo = document.getElementById('tr-tipo')?.value || 'laboratorial';
-
-  try {
-    // Converter arquivo para base64
-    const base64 = await fileToBase64(file);
-    const mediaType = file.type || 'application/pdf';
-
-    // Prompt específico para exames médicos
-    const response = await fetch('/api/transcribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileData: base64, mediaType, tipo })
-    });
-
-    const data = await response.json();
-
-    if (data.error) {
-      status.innerHTML = `<span style="color:var(--red)">❌ Erro: ${data.error}</span>`;
-      return;
-    }
-
-    const texto = data.transcricao || 'Não foi possível transcrever.';
-    trTranscricaoAtual = texto;
-    resultado.textContent = texto;
-    status.innerHTML = '<span style="color:var(--green)">✅ Transcrição concluída!</span>';
-    btnCopiar.style.display = 'inline-flex';
-    btnSalvar.style.display = 'inline-flex';
-
-  } catch (err) {
-    status.innerHTML = `<span style="color:var(--red)">❌ Erro: ${err.message}</span>`;
-    console.error(err);
-  }
-}
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-function copiarTranscricao() {
-  navigator.clipboard.writeText(trTranscricaoAtual);
-  const btn = document.getElementById('btn-copiar');
-  btn.textContent = '✅ Copiado!';
-  setTimeout(() => btn.textContent = '📋 Copiar', 2000);
-}
-
-async function salvarTranscricao() {
-  const pacNome = document.getElementById('tr-pac-nome')?.value?.trim();
-  const tipo = document.getElementById('tr-tipo')?.value;
-  if (!trTranscricaoAtual) return;
-  if (!pacNome) { alert('Selecione uma paciente antes de salvar.'); return; }
-
-  // buscar id da paciente
-  const { data: pac } = await sb.from('pacientes').select('id').ilike('nome', pacNome).single();
-
-  await sb.from('exames_laboratoriais').insert({
-    paciente_id: pac?.id || null,
-    data_exame: new Date().toISOString().split('T')[0],
-    laboratorio: tipo,
-    transcricao: trTranscricaoAtual,
-  });
-
-  const btn = document.getElementById('btn-salvar');
-  btn.textContent = '✅ Salvo!';
-  btn.style.background = 'var(--green)';
-  setTimeout(() => { btn.textContent = '💾 Salvar no perfil'; btn.style.background = ''; }, 2000);
-  carregarHistoricoTranscricoes();
-}
-
-async function carregarHistoricoTranscricoes() {
-  const { data } = await sb.from('exames_laboratoriais').select('*, pacientes(nome)').order('created_at', { ascending: false }).limit(20);
-  const hist = document.getElementById('tr-historico');
-  if (!data?.length) { hist.innerHTML = '<div style="font-size:13px;color:var(--muted)">Nenhuma transcrição salva ainda.</div>'; return; }
-  hist.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Data</th><th>Paciente</th><th>Tipo</th><th>Resumo</th><th></th></tr></thead><tbody>
-    ${data.map(e => `<tr>
-      <td>${new Date(e.created_at).toLocaleDateString('pt-BR')}</td>
-      <td>${e.pacientes?.nome || '—'}</td>
-      <td>${e.laboratorio || '—'}</td>
-      <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--muted)">${e.transcricao?.substring(0,100) || '—'}...</td>
-      <td><button class="btn-sm outline" onclick="verTranscricao(\`${e.transcricao?.replace(/\`/g,"'") || ''}\`)">Ver</button></td>
-    </tr>`).join('')}
-  </tbody></table></div>`;
-}
-
-function verTranscricao(texto) {
-  trTranscricaoAtual = texto;
-  document.getElementById('tr-resultado').textContent = texto;
-  document.getElementById('btn-copiar').style.display = 'inline-flex';
-  switchTab('transcricao');
-  window.scrollTo(0, 0);
-}
-
-function loadTranscricao() {
-  carregarHistoricoTranscricoes();
-  setTimeout(() => acInput('tr-pac-nome', 'ac-list-tr'), 100);
 }
 
 function closeModal(e){
