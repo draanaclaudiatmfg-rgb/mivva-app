@@ -192,6 +192,19 @@ tr:hover td{background:var(--bg2);}
 .colab-cargo{font-size:12px;color:var(--muted);}
 .colab-info{display:flex;gap:20px;font-size:12px;color:var(--muted);flex-wrap:wrap;}
 
+
+/* PAINEL LATERAL EXAMES */
+.side-panel{position:fixed;top:0;right:-420px;width:400px;height:100vh;background:#fff;border-left:1px solid var(--border);box-shadow:-4px 0 20px rgba(61,31,78,0.1);z-index:300;transition:right 0.3s ease;display:flex;flex-direction:column;}
+.side-panel.open{right:0;}
+.side-panel-header{padding:20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--p);}
+.side-panel-header h3{color:#fff;font-size:16px;font-weight:400;font-family:'Cormorant Garamond',serif;}
+.side-panel-close{background:none;border:none;color:rgba(255,255,255,0.7);font-size:20px;cursor:pointer;padding:0;}
+.side-panel-close:hover{color:#fff;}
+.side-panel-body{padding:20px;overflow-y:auto;flex:1;}
+.side-panel-pac{font-size:18px;font-family:'Cormorant Garamond',serif;color:var(--p);margin-bottom:4px;}
+.side-panel-detail{font-size:12px;color:var(--muted);margin-bottom:16px;}
+.side-panel-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:299;}
+.side-panel-overlay.open{display:block;}
 .empty{text-align:center;padding:48px 20px;color:var(--muted);}
 .empty-icon{font-size:32px;margin-bottom:12px;opacity:0.4;}
 .loading{text-align:center;padding:40px;color:var(--muted);}
@@ -375,6 +388,27 @@ tr:hover td{background:var(--bg2);}
       </div>
     </div>
 
+  </div>
+</div>
+
+
+<!-- PAINEL LATERAL EXAMES -->
+<div class="side-panel-overlay" id="sp-overlay" onclick="closeSidePanel()"></div>
+<div class="side-panel" id="side-panel">
+  <div class="side-panel-header">
+    <h3>📎 Exames</h3>
+    <button class="side-panel-close" onclick="closeSidePanel()">×</button>
+  </div>
+  <div class="side-panel-body">
+    <div class="side-panel-pac" id="sp-pac-nome"></div>
+    <div class="side-panel-detail" id="sp-pac-detail"></div>
+    <div id="sp-pdf-list"><div class="loading">Carregando...</div></div>
+    <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
+      <div class="upload-area" onclick="document.getElementById('sp-file-input').click()" style="padding:16px;">
+        <input type="file" id="sp-file-input" accept="image/*,.pdf" multiple onchange="spUpload(this.files)"/>
+        <div style="font-size:13px;color:var(--muted)">+ Adicionar exame</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -593,7 +627,7 @@ async function renderCal(){
             const dur=0.75;// 45min default
             const height=dur*48;
             const cls=!e.data_pagamento?'sem-pag':(e.tipo||'outro');
-            return`<div class="cal-event ${cls}" style="top:${top}px;height:${height}px;" onclick="event.stopPropagation();openModalEdit('agendamento','${e.id}')">
+            return`<div class="cal-event ${cls}" style="top:${top}px;height:${height}px;" onclick="event.stopPropagation();abrirSidePanel('${e.pacientes?.nome||''}','${e.pacientes?.diagnostico||''}','${e.data_hora}')">
               <div class="ev-time">${fmtH(e.data_hora)}</div>
               <div class="ev-name">${e.pacientes?.nome||'—'}</div>
             </div>`;
@@ -688,6 +722,7 @@ async function loadAgendamentos(){
     <td>${fmtR(a.valor)}</td>
     <td><span class="badge ${a.nf_status==='emitida'?'bg-green':'bg-amber'}">${a.nf_status||'pendente'}</span>${a.nf_numero?' Nº'+a.nf_numero:''}</td>
     <td>${statusBadge(a.status)}</td>
+    <td><button class="btn-sm outline" onclick="abrirSidePanel('${a.pacientes?.nome||''}','${a.pacientes?.diagnostico||''}','${a.data_hora}')">📎</button></td>
     <td>${a.pacientes?.telefone?`<button class="btn-sm whatsapp" onclick="abrirWhatsApp('${a.pacientes.telefone}','${a.pacientes.nome}','${a.data_hora}','')">📱</button>`:'—'}</td>
     <td style="white-space:nowrap"><button class="btn-sm" onclick="openModalEdit('agendamento','${a.id}')">Editar</button> <button class="btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #F09595;" onclick="excluirAgendamento('${a.id}')">🗑</button></td>
   </tr>`).join('');
@@ -944,6 +979,65 @@ async function loadDashboard(){
 }
 
 // ── WHATSAPP ──────────────────────────────────────────────────
+
+// ── PAINEL LATERAL EXAMES ─────────────────────────────────────
+let spPacNome = '';
+
+async function abrirSidePanel(pacNome, diagnostico, dataHora) {
+  spPacNome = pacNome;
+  document.getElementById('sp-pac-nome').textContent = pacNome || '—';
+  document.getElementById('sp-pac-detail').textContent = 
+    (diagnostico ? diagnostico + ' · ' : '') + (dataHora ? fmt(dataHora) + ' ' + fmtH(dataHora) : '');
+  document.getElementById('side-panel').classList.add('open');
+  document.getElementById('sp-overlay').classList.add('open');
+  await spCarregarPDFs(pacNome);
+}
+
+function closeSidePanel() {
+  document.getElementById('side-panel').classList.remove('open');
+  document.getElementById('sp-overlay').classList.remove('open');
+}
+
+async function spCarregarPDFs(pacNome) {
+  const list = document.getElementById('sp-pdf-list');
+  if (!pacNome) { list.innerHTML = '<div style="font-size:13px;color:var(--muted)">Nenhuma paciente selecionada.</div>'; return; }
+  const folder = pacNome.replace(/[^a-zA-Z0-9 ]/g,'').replace(/\s+/g,'_');
+  list.innerHTML = '<div class="loading">Carregando...</div>';
+  const { data: files, error } = await sb.storage.from('exames').list(folder, { limit: 50 });
+  if (error || !files?.length) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--muted);text-align:center;padding:20px;">Nenhum exame enviado ainda.<br><span style="font-size:11px">Use o campo abaixo para adicionar.</span></div>';
+    return;
+  }
+  list.innerHTML = files.filter(f=>f.name).map(f => {
+    const { data: urlData } = sb.storage.from('exames').getPublicUrl(folder + '/' + f.name);
+    const isImg = /\.(jpg|jpeg|png|gif)$/i.test(f.name);
+    const kb = f.metadata?.size ? Math.round(f.metadata.size/1024) + ' KB' : '';
+    return `<div class="pdf-item">
+      <div>
+        <a href="${urlData.publicUrl}" target="_blank">${isImg?'🖼':'📄'} ${f.name}</a>
+        <div class="pdf-meta">${kb}</div>
+      </div>
+      <button class="btn-del" onclick="spDeletarPDF('${folder}','${f.name}')">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+async function spUpload(files) {
+  if (!files?.length || !spPacNome) return;
+  const folder = spPacNome.replace(/[^a-zA-Z0-9 ]/g,'').replace(/\s+/g,'_');
+  for (const file of Array.from(files)) {
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    await sb.storage.from('exames').upload(`${folder}/${Date.now()}_${safeName}`, file, { upsert: true });
+  }
+  await spCarregarPDFs(spPacNome);
+}
+
+async function spDeletarPDF(folder, name) {
+  if (!confirm('Remover este arquivo?')) return;
+  await sb.storage.from('exames').remove([folder + '/' + name]);
+  await spCarregarPDFs(spPacNome);
+}
+
 async function excluirAgendamento(id) {
   if (!confirm('Excluir este agendamento? Esta ação não pode ser desfeita.')) return;
   const { error } = await sb.from('agendamentos').delete().eq('id', id);
