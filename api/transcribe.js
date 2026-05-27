@@ -18,40 +18,44 @@ export default async function handler(req, res) {
 
   try {
     const { fileData, mediaType, tipo } = req.body;
-
-    const prompts = {
-      laboratorial: `Você é um assistente médico especializado em endocrinologia. Transcreva este exame laboratorial de forma organizada.
-
-Formato de saída:
-- Liste cada exame em uma linha
-- Formato: NOME DO EXAME: valor unidade (referência: mín-máx)
-- Destaque com ⚠️ valores fora da referência
-- No final, escreva um resumo clínico em 2-3 linhas com os achados relevantes
-- Use linguagem técnica médica
-- Não omita nenhum resultado`,
-      imagem: `Você é um assistente médico especializado em endocrinologia. Transcreva este laudo de exame de imagem.
-
-Formato:
-- Tipo de exame e data (se disponível)
-- Técnica utilizada
-- Achados principais (tópicos)
-- Conclusão/Impressão diagnóstica
-- Destaque com ⚠️ achados relevantes ou alterados`,
-      bioimpedancia: `Você é um assistente médico especializado em endocrinologia e composição corporal. Transcreva este exame de bioimpedância.
-
-Formato:
-- Dados antropométricos (peso, altura, IMC)
-- Composição corporal: massa magra, massa gorda, % gordura
-- Água corporal total
-- Taxa metabólica basal
-- Índice de massa muscular
-- Destaque com ⚠️ valores alterados
-- Resumo clínico em 2 linhas`,
-      outro: `Você é um assistente médico. Transcreva este exame médico de forma organizada, destacando valores alterados com ⚠️ e fornecendo resumo clínico ao final.`
-    };
-
-    const prompt = prompts[tipo] || prompts.outro;
     const contentType = mediaType === 'application/pdf' ? 'document' : 'image';
+
+    const prompt = `Você é um assistente médico especializado em transcrição de exames clínicos para a Dra. Ana Cláudia Meirelles, endocrinologista.
+
+Identifique o tipo de exame e aplique o formato correto:
+
+## TIPO A — Exames Laboratoriais
+Formato: linha única, SIGLA MAIÚSCULA valor, separados por vírgula, sem unidades, ponto como decimal.
+Cabeçalho: [Laboratório], [data]:
+Exemplo: Laboratório X, 03/2025: TSH 1.3, T4L 1.3, GLICOSE 88, HBA1C 4.7, INSULINA 5,
+
+HEMOGRAMA: transcrever APENAS 4 campos: HB, HT, LEUCO, PLQ — ignorar todo o resto.
+
+Siglas obrigatórias:
+TSH, T4L, T3L, ANTI-TPO, ANTI-TG, GLICOSE, HBA1C, INSULINA, COLESTEROL TOTAL, LDL, HDL, TRIGLI, VLDL, NAO-HDL, TGO, TGP, GGT, FERRITINA, FERRO, CREATININA, UREIA, VIT D, B12, AC FOLICO, CORTISOL, DHEAS, E2, FSH, LH, PROGEST, PROLACT, TESTO, TESTO LIVRE, PCR, CALCIO IONIZADO, SODIO, POTASSIO, MAGNESIO, FOSFORO, ZINCO, ALBUMINA, HB, HT, LEUCO, PLQ, BT, BD, BI, AC URICO, PSA
+
+Para exames fora da lista, criar sigla curta em maiúsculas.
+
+## TIPO B — Urina 1 (EAS)
+Formato: [Lab], [data] — URINA 1: [campo]: [valor], (apenas campos ALTERADOS)
+Se tudo normal: [Lab], [data] — URINA 1: sem alterações.
+
+## TIPO C/D — Laudos de Imagem (USG, TC, RM, Densitometria, ECO)
+Formato texto corrido por órgão/estrutura.
+Para nódulos: localização, dimensões (3 eixos), ecogenicidade, composição, contornos, calcificações, vascularização, TIRADS/BI-RADS.
+Sempre incluir Conclusão do laudo.
+Omitir achados normais irrelevantes.
+
+## PRIVACIDADE
+Remover: nome do paciente, CPF, RG, data de nascimento, endereço, telefone.
+Substituir por [PACIENTE] se necessário.
+
+## REGRAS GERAIS
+- Leia todo o exame antes de transcrever
+- Valores ilegíveis: [?]
+- Múltiplos exames no mesmo arquivo: transcrever separadamente com título
+- Manter ordem do laudo
+- Não omitir nenhum resultado (exceto hemograma — só 4 campos)`;
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
