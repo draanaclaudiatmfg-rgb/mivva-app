@@ -842,15 +842,21 @@ async function loadProgramas(){
   const body=document.getElementById('programas-body');
   if(!rows.length){body.innerHTML='<tr><td colspan="8" class="empty">Nenhum programa.</td></tr>';return;}
   body.innerHTML=rows.map(p=>{
-    const feitas=(p.programa_consultas||[]).length;
+    const feitas=p.realizadas||(p.programa_consultas||[]).length;
     const total=p.total_consultas||6;
     const pct=Math.round((feitas/total)*100);
     const bc=pct===100?'done':pct>80?'warn':'';
     const stMap={em_andamento:'bg-blue',concluido:'bg-green',cancelado:'bg-red',pausado:'bg-gray',pag_pendente:'bg-amber'};
+    // mini tabela de especialidades
+    const specs=[];
+    if(p.cons_endo_total>0)specs.push(`Endo: ${p.cons_endo_real||0}/${p.cons_endo_total}`);
+    if(p.cons_nutri_total>0)specs.push(`Nutri: ${p.cons_nutri_real||0}/${p.cons_nutri_total}`);
+    if(p.cons_psico_total>0)specs.push(`Psico: ${p.cons_psico_real||0}/${p.cons_psico_total}`);
+    if(p.cons_personal_total>0)specs.push(`Personal: ${p.cons_personal_real||0}/${p.cons_personal_total}`);
     return`<tr>
       <td>${p.pacientes?.nome||'—'}</td>
       <td>${tipoBadge(p.tipo)}</td>
-      <td>${p.modalidade||p.total_consultas+' consultas'}</td>
+      <td style="font-size:11px;color:var(--muted)">${specs.length?specs.join(' · '):p.total_consultas+' consultas'}</td>
       <td>${p.forma_pagamento||'—'}</td>
       <td>${fmtR(p.valor_total)}</td>
       <td style="min-width:110px"><div style="display:flex;align-items:center;gap:8px;"><div class="prog-bar-wrap"><div class="prog-bar ${bc}" style="width:${pct}%"></div></div><span style="font-size:11px;color:var(--muted)">${feitas}/${total}</span></div></td>
@@ -908,9 +914,10 @@ async function loadExames(){
     <div style="font-size:12px;color:var(--muted)">${e.exames_solicitados||'—'}</div>
     ${e.obs_clinicas?`<div style="font-size:12px;color:var(--p);margin-top:4px">⚑ ${e.obs_clinicas}</div>`:''}
     <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
-      ${!e.revisado?`<button class="btn-sm green" onclick="marcarRevisado('${e.id}')">✓ Revisado</button>`:''}
+      ${!e.revisado?`<button class="btn-sm green" onclick="marcarRevisado('${e.id}')">👁 Visto</button>`:'<span class="badge bg-green">✓ Visto</span>'}
       ${e.pacientes?.telefone?`<button class="btn-sm whatsapp" onclick="abrirWhatsAppExame('${e.pacientes.telefone}','${e.pacientes.nome}','${e.exames_solicitados||''}','${e.data_consulta}')">📱 Cobrar exames</button>`:''}
       <button class="btn-sm outline" onclick="openModalEdit('exame','${e.id}')">Editar</button>
+      <button class="btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #F09595;" onclick="excluirExame('${e.id}')">🗑 Excluir</button>
     </div>
   </div>`;
   document.getElementById('exames-urgentes').innerHTML=urg.length?`<div class="alert-section-label red">⚠ Urgente — consulta em até 3 dias</div>${urg.map(e=>card(e,'urgente')).join('')}`:'';
@@ -994,6 +1001,12 @@ async function deletePDF(folder, name) {
   await carregarPDFs(editingId, pacNome);
 }
 
+async function excluirExame(id) {
+  if (!confirm('Excluir este exame permanentemente?')) return;
+  await sb.from('exames').delete().eq('id', id);
+  loadExames();
+}
+
 function abrirWhatsAppExame(tel,nome,exames,dataConsulta){
   const t=tel?.replace(/\D/g,'');if(!t)return;
   const data=dataConsulta?new Date(dataConsulta).toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'}):'';
@@ -1048,6 +1061,8 @@ async function loadRH(){
       </div>
       <div class="colab-info">
         <span>Salário: ${fmtR(c.salario_base)}</span>
+        ${c.regime?`<span class="badge bg-gray">${c.regime}</span>`:''}
+        ${c.dia_pagamento?`<span>Pag. dia ${c.dia_pagamento}</span>`:''}
         <span>Pix: ${c.chave_pix||'—'}</span>
         <span>Último pag.: ${ult?fmt(ult.data_pagamento)+' · '+fmtR(ult.valor_liquido):'—'}</span>
       </div>
@@ -1168,9 +1183,13 @@ async function loadLeads() {
     const [sCls, sLabel] = statusMap[l.status] || ['bg-gray', l.status];
     const fdStr = l.followup_data ? fmt(l.followup_data) : '—';
     const fdVencido = l.followup_data && new Date(l.followup_data) <= hoje && !['convertido','perdido'].includes(l.status);
-    return `<tr ${fdVencido ? 'style="background:rgba(252,235,235,0.3)"' : ''}>
+    const naoResp = l.nao_respondeu && !['convertido','perdido','agendado'].includes(l.status);
+    let rowStyle = '';
+    if (fdVencido) rowStyle = 'background:rgba(252,235,235,0.4)';
+    else if (naoResp) rowStyle = 'background:rgba(250,238,218,0.4)';
+    return `<tr ${rowStyle ? `style="${rowStyle}"` : ''}>
       <td>${fmt(l.created_at)}</td>
-      <td style="font-weight:500">${l.nome}</td>
+      <td style="font-weight:500">${l.nome}${naoResp ? ' <span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 5px;border-radius:10px;">sem resposta</span>' : ''}</td>
       <td><span class="badge bg-gray">${l.origem || '—'}</span></td>
       <td>${l.interesse || '—'}</td>
       <td><span class="badge ${sCls}">${sLabel}</span></td>
@@ -1315,8 +1334,11 @@ const modalForms={
       <div class="form-group"><label>Data pagamento</label><input type="date" id="f-data-pag" value="${d.data_pagamento||''}"/></div>
     </div>
     <div class="form-grid">
-      <div class="form-group"><label>NF status</label><select id="f-nf-status"><option value="pendente" ${d.nf_status==='pendente'?'selected':''}>Pendente</option><option value="emitida" ${d.nf_status==='emitida'?'selected':''}>Emitida</option><option value="isenta" ${d.nf_status==='isenta'?'selected':''}>Isenta</option></select></div>
+      <div class="form-group"><label>NF status</label><select id="f-nf-status" onchange="toggleNFLink()"><option value="pendente" ${d.nf_status==='pendente'?'selected':''}>Não emitida</option><option value="emitida" ${d.nf_status==='emitida'?'selected':''}>Emitida ✓</option><option value="isenta" ${d.nf_status==='isenta'?'selected':''}>Isenta</option></select></div>
       <div class="form-group"><label>Nº NF</label><input id="f-nf-num" value="${d.nf_numero||''}"/></div>
+    </div>
+    <div class="form-grid" id="nf-link-row" style="display:${d.nf_status==='emitida'?'grid':'none'}">
+      <div class="form-group" style="grid-column:1/-1"><label>Link da NF</label><input id="f-nf-link" value="${d.nf_link||''}" placeholder="https://..."/></div>
     </div>
     <div class="form-grid full"><div class="form-group"><label>Status</label><select id="f-status-ag"><option value="agendada" ${d.status==='agendada'?'selected':''}>Agendada</option><option value="realizada" ${d.status==='realizada'?'selected':''}>Realizada</option><option value="cancelada" ${d.status==='cancelada'?'selected':''}>Cancelada</option><option value="remarcada" ${d.status==='remarcada'?'selected':''}>Remarcada</option></select></div></div>
     <div class="form-grid full"><div class="form-group"><label>Observações</label><textarea id="f-obs">${d.observacoes||''}</textarea></div></div>
@@ -1351,14 +1373,26 @@ const modalForms={
       <div class="form-group"><label>Tipo</label><select id="f-tipo-prog"><option value="sinfonia" ${d.tipo==='sinfonia'?'selected':''}>Sinfonia</option><option value="pacote">Pacote</option><option value="outro">Outro</option></select></div>
     </div>
     <div class="form-grid">
-      <div class="form-group"><label>Total de consultas</label><input type="number" id="f-total-cons" value="${d.total_consultas||6}"/></div>
       <div class="form-group"><label>Valor total (R$)</label><input type="number" id="f-val-prog" value="${d.valor_total||''}"/></div>
+      <div class="form-group"><label>Forma de pagamento</label><input id="f-forma-prog" value="${d.forma_pagamento||''}"/></div>
     </div>
     <div class="form-grid">
-      <div class="form-group"><label>Forma de pagamento</label><input id="f-forma-prog" value="${d.forma_pagamento||''}"/></div>
       <div class="form-group"><label>Data de início</label><input type="date" id="f-inicio-prog" value="${d.data_inicio||''}"/></div>
+      <div class="form-group"><label>Status</label><select id="f-st-prog"><option value="em_andamento">Em andamento</option><option value="pag_pendente">Pag. pendente</option><option value="concluido">Concluído</option><option value="cancelado">Cancelado</option><option value="pausado">Pausado</option></select></div>
     </div>
-    <div class="form-grid full"><div class="form-group"><label>Status</label><select id="f-st-prog"><option value="em_andamento">Em andamento</option><option value="pag_pendente">Pag. pendente</option><option value="concluido">Concluído</option><option value="cancelado">Cancelado</option><option value="pausado">Pausado</option></select></div></div>`,
+    <div style="margin:8px 0 4px;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;">Consultas por especialidade</div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+      <div class="form-group"><label>Endocrino (total)</label><input type="number" id="f-cons-endo-total" value="${d.cons_endo_total||0}" min="0"/></div>
+      <div class="form-group"><label>Realizadas</label><input type="number" id="f-cons-endo-real" value="${d.cons_endo_real||0}" min="0"/></div>
+      <div class="form-group"><label>Nutri (total)</label><input type="number" id="f-cons-nutri-total" value="${d.cons_nutri_total||0}" min="0"/></div>
+      <div class="form-group"><label>Realizadas</label><input type="number" id="f-cons-nutri-real" value="${d.cons_nutri_real||0}" min="0"/></div>
+    </div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+      <div class="form-group"><label>Psicóloga (total)</label><input type="number" id="f-cons-psico-total" value="${d.cons_psico_total||0}" min="0"/></div>
+      <div class="form-group"><label>Realizadas</label><input type="number" id="f-cons-psico-real" value="${d.cons_psico_real||0}" min="0"/></div>
+      <div class="form-group"><label>Personal (total)</label><input type="number" id="f-cons-personal-total" value="${d.cons_personal_total||0}" min="0"/></div>
+      <div class="form-group"><label>Realizadas</label><input type="number" id="f-cons-personal-real" value="${d.cons_personal_real||0}" min="0"/></div>
+    </div>`,
 
   exame:(d={})=>`<h3>Exames do paciente</h3>
     <div class="form-grid">
@@ -1395,6 +1429,10 @@ const modalForms={
       <div class="form-group"><label>Cargo</label><input id="f-colab-cargo" value="${d.cargo||''}"/></div>
     </div>
     <div class="form-grid">
+      <div class="form-group"><label>Regime</label><select id="f-colab-regime"><option value="MEI" ${d.regime==='MEI'?'selected':''}>MEI</option><option value="CLT" ${d.regime==='CLT'?'selected':''}>CLT</option><option value="PJ" ${d.regime==='PJ'?'selected':''}>PJ</option><option value="Autônomo" ${d.regime==='Autônomo'?'selected':''}>Autônomo</option></select></div>
+      <div class="form-group"><label>Dia de pagamento</label><input type="number" id="f-colab-diapag" value="${d.dia_pagamento||''}" min="1" max="31" placeholder="Ex: 5"/></div>
+    </div>
+    <div class="form-grid">
       <div class="form-group"><label>Salário base (R$)</label><input type="number" id="f-colab-sal" value="${d.salario_base||''}"/></div>
       <div class="form-group"><label>Chave Pix</label><input id="f-colab-pix" value="${d.chave_pix||''}"/></div>
     </div>
@@ -1428,6 +1466,12 @@ const modalForms={
         <option value="7">7 dias</option>
       </select></div>
     </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Não respondeu?</label><select id="f-lead-nao-resp">
+        <option value="">—</option>
+        <option value="sim">Sim — agendar follow up automático</option>
+      </select></div>
+    </div>
     <div class="form-grid full"><div class="form-group"><label>Observações</label><textarea id="f-lead-obs">${d.observacoes||''}</textarea></div></div>
     ${d.id?`<div style="margin-top:8px;padding-top:12px;border-top:1px solid var(--border)"><button onclick="excluirLead('${d.id}')" style="background:none;border:1px solid var(--red);color:var(--red);padding:7px 14px;border-radius:var(--radius);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;">🗑 Excluir lead</button></div>`:''}`,
 
@@ -1444,6 +1488,11 @@ const modalForms={
     </div>`,
 };
 
+function toggleNFLink(){
+  const sel=document.getElementById('f-nf-status');
+  const row=document.getElementById('nf-link-row');
+  if(row)row.style.display=sel?.value==='emitida'?'grid':'none';
+}
 function calcLiq(){
   const b=parseFloat(document.getElementById('f-sal-bruto')?.value)||0;
   const d=parseFloat(document.getElementById('f-sal-desc')?.value)||0;
@@ -1493,7 +1542,7 @@ async function saveModal(){
 
   if(type==='agendamento'){
     const pid=await getPacId(document.getElementById('f-pac-nome')?.value?.trim());
-    const payload={paciente_id:pid,tipo:document.getElementById('f-tipo-ag')?.value,data_hora:document.getElementById('f-data-hora')?.value,valor:document.getElementById('f-valor')?.value||null,forma_pagamento:document.getElementById('f-forma-pag')?.value||null,data_pagamento:document.getElementById('f-data-pag')?.value||null,nf_status:document.getElementById('f-nf-status')?.value,nf_numero:document.getElementById('f-nf-num')?.value||null,status:document.getElementById('f-status-ag')?.value,observacoes:document.getElementById('f-obs')?.value||null};
+    const payload={paciente_id:pid,tipo:document.getElementById('f-tipo-ag')?.value,data_hora:document.getElementById('f-data-hora')?.value,valor:document.getElementById('f-valor')?.value||null,forma_pagamento:document.getElementById('f-forma-pag')?.value||null,data_pagamento:document.getElementById('f-data-pag')?.value||null,nf_status:document.getElementById('f-nf-status')?.value,nf_numero:document.getElementById('f-nf-num')?.value||null,nf_link:document.getElementById('f-nf-link')?.value||null,status:document.getElementById('f-status-ag')?.value,observacoes:document.getElementById('f-obs')?.value||null};
     if(editingId)await sb.from('agendamentos').update(payload).eq('id',editingId);
     else await sb.from('agendamentos').insert(payload);
     if(payload.status==='realizada'&&pid)await sb.from('pacientes').update({ultima_consulta:payload.data_hora?.split('T')[0]}).eq('id',pid);
@@ -1505,7 +1554,26 @@ async function saveModal(){
   }
   else if(type==='programa'){
     const pid=await getPacId(document.getElementById('f-pac-prog')?.value?.trim());
-    const payload={paciente_id:pid,tipo:document.getElementById('f-tipo-prog')?.value,total_consultas:document.getElementById('f-total-cons')?.value||6,valor_total:document.getElementById('f-val-prog')?.value||null,forma_pagamento:document.getElementById('f-forma-prog')?.value||null,data_inicio:document.getElementById('f-inicio-prog')?.value||null,status:document.getElementById('f-st-prog')?.value};
+    const etotal=parseInt(document.getElementById('f-cons-endo-total')?.value)||0;
+    const ereal=parseInt(document.getElementById('f-cons-endo-real')?.value)||0;
+    const ntotal=parseInt(document.getElementById('f-cons-nutri-total')?.value)||0;
+    const nreal=parseInt(document.getElementById('f-cons-nutri-real')?.value)||0;
+    const ptotal=parseInt(document.getElementById('f-cons-psico-total')?.value)||0;
+    const preal=parseInt(document.getElementById('f-cons-psico-real')?.value)||0;
+    const prtotal=parseInt(document.getElementById('f-cons-personal-total')?.value)||0;
+    const prreal=parseInt(document.getElementById('f-cons-personal-real')?.value)||0;
+    const total_consultas=etotal+ntotal+ptotal+prtotal||6;
+    const realizadas=ereal+nreal+preal+prreal;
+    const payload={paciente_id:pid,tipo:document.getElementById('f-tipo-prog')?.value,
+      total_consultas,realizadas,
+      cons_endo_total:etotal,cons_endo_real:ereal,
+      cons_nutri_total:ntotal,cons_nutri_real:nreal,
+      cons_psico_total:ptotal,cons_psico_real:preal,
+      cons_personal_total:prtotal,cons_personal_real:prreal,
+      valor_total:document.getElementById('f-val-prog')?.value||null,
+      forma_pagamento:document.getElementById('f-forma-prog')?.value||null,
+      data_inicio:document.getElementById('f-inicio-prog')?.value||null,
+      status:document.getElementById('f-st-prog')?.value};
     if(editingId)await sb.from('programas').update(payload).eq('id',editingId);
     else await sb.from('programas').insert(payload);
   }
@@ -1517,10 +1585,16 @@ async function saveModal(){
   }
   else if(type==='lead'){
     const followupDias = document.getElementById('f-lead-followup')?.value;
+    const naoResp = document.getElementById('f-lead-nao-resp')?.value === 'sim';
     let followupData = null;
     if (followupDias) {
       const d = new Date();
       d.setDate(d.getDate() + parseInt(followupDias));
+      followupData = d.toISOString().split('T')[0];
+    } else if (naoResp && !editingId) {
+      // se não respondeu e novo lead, agenda follow up em 3 dias automaticamente
+      const d = new Date();
+      d.setDate(d.getDate() + 3);
       followupData = d.toISOString().split('T')[0];
     }
     const payload = {
@@ -1530,13 +1604,14 @@ async function saveModal(){
       interesse: document.getElementById('f-lead-interesse')?.value || null,
       status: document.getElementById('f-lead-status')?.value || 'novo',
       followup_data: followupData,
+      nao_respondeu: naoResp,
       observacoes: document.getElementById('f-lead-obs')?.value || null,
     };
     if (editingId) await sb.from('leads').update(payload).eq('id', editingId);
     else await sb.from('leads').insert(payload);
   }
   else if(type==='colaborador'){
-    const payload={nome:document.getElementById('f-colab-nome')?.value,cargo:document.getElementById('f-colab-cargo')?.value||null,salario_base:document.getElementById('f-colab-sal')?.value||null,banco:document.getElementById('f-colab-banco')?.value||null,chave_pix:document.getElementById('f-colab-pix')?.value||null,data_admissao:document.getElementById('f-colab-adm')?.value||null,observacoes:document.getElementById('f-colab-obs')?.value||null};
+    const payload={nome:document.getElementById('f-colab-nome')?.value,cargo:document.getElementById('f-colab-cargo')?.value||null,regime:document.getElementById('f-colab-regime')?.value||null,dia_pagamento:document.getElementById('f-colab-diapag')?.value||null,salario_base:document.getElementById('f-colab-sal')?.value||null,banco:document.getElementById('f-colab-banco')?.value||null,chave_pix:document.getElementById('f-colab-pix')?.value||null,data_admissao:document.getElementById('f-colab-adm')?.value||null,observacoes:document.getElementById('f-colab-obs')?.value||null};
     if(editingId)await sb.from('colaboradores').update(payload).eq('id',editingId);
     else await sb.from('colaboradores').insert(payload);
   }
