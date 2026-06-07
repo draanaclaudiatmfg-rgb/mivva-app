@@ -783,7 +783,7 @@ async function renderCal(){
             const dur=0.75;// 45min default
             const height=dur*48;
             const cls=!e.data_pagamento?'sem-pag':(e.tipo||'outro');
-            return`<div class="cal-event ${cls}" style="top:${top}px;height:${height}px;" onclick="event.stopPropagation();abrirSidePanel('${e.pacientes?.nome||''}','${e.pacientes?.diagnostico||''}','${e.data_hora}')">
+            return`<div class="cal-event ${cls}" style="top:${top}px;height:${height}px;" onclick="event.stopPropagation();openModalEdit('agendamento','${e.id}')">
               <div class="ev-time">${fmtH(e.data_hora)}</div>
               <div class="ev-name">${e.pacientes?.nome||'—'}</div>
             </div>`;
