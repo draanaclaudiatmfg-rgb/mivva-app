@@ -76,7 +76,7 @@ h1,h2,h3{font-family:'Cormorant Garamond',serif;}
 .cal-day-label{padding:8px 4px;text-align:center;font-size:12px;border-left:1px solid var(--border);}
 .cal-day-label .weekday{color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:0.5px;}
 .cal-day-label .daynum{font-size:20px;font-family:'Cormorant Garamond',serif;color:var(--p);line-height:1.2;}
-.cal-day-label.today .daynum{background:var(--pm);color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto;}
+.cal-day-label.feriado{background:rgba(231,76,60,0.05);}.cal-day-label.feriado .daynum{color:#c0392b;}.cal-day-label.today .daynum{background:var(--pm);color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto;}
 .cal-corner{padding:8px 4px;font-size:11px;color:var(--muted);text-align:right;padding-right:6px;}
 
 .cal-body{display:grid;grid-template-columns:56px repeat(7,1fr);max-height:600px;overflow-y:auto;}
@@ -560,8 +560,19 @@ async function initApp(user){
   switchTab('agenda');
 }
 function applyRoles(){
-  const ok=currentProfile?.perfil==='proprietaria';
-  document.querySelectorAll('.fin-only').forEach(el=>el.style.display=ok?'':'none');
+  const isProprietaria=currentProfile?.perfil==='proprietaria';
+  const isSecretaria=currentProfile?.perfil==='secretaria';
+  // proprietaria vê tudo
+  // secretaria vê leads e financeiro mas NÃO vê dashboard e RH
+  document.querySelectorAll('.fin-only').forEach(el=>{
+    // fin-only são: financeiro, rh, dashboard, leads
+    el.style.display=(isProprietaria||isSecretaria)?'':'none';
+  });
+  // esconder dashboard e RH para secretaria
+  if(isSecretaria){
+    document.getElementById('nav-dashboard').style.display='none';
+    document.getElementById('nav-rh').style.display='none';
+  }
 }
 async function doLogout(){await sb.auth.signOut();location.reload();}
 sb.auth.getSession().then(({data:{session}})=>{if(session)initApp(session.user);});
@@ -578,8 +589,8 @@ function switchTab(id){
 }
 
 // ── HELPERS ───────────────────────────────────────────────────
-const fmt=v=>v?new Date(v).toLocaleDateString('pt-BR'):'—';
-const fmtH=v=>v?new Date(v).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'';
+const fmt=v=>v?new Date(v).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}):'—';
+const fmtH=v=>v?new Date(v).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}):'';
 const fmtR=v=>v!=null?'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—';
 const badge=(t,c)=>`<span class="badge ${c}">${t}</span>`;
 const tipoBadge=t=>{const m={sinfonia:'bg-purple',avulsa:'bg-gray',pacote:'bg-blue',outro:'bg-gray'};return badge(t||'—',m[t]||'bg-gray');};
@@ -672,10 +683,49 @@ function calNext(){
 }
 function calHoje(){calDate=new Date();renderCal();}
 
+
+// ── FERIADOS BRASILEIROS ──────────────────────────────────────
+function getFeriados(ano) {
+  // Calcular Páscoa (algoritmo de Butcher)
+  const a=ano%19,b=Math.floor(ano/100),c=ano%100;
+  const d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25);
+  const g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
+  const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7;
+  const m=Math.floor((a+11*h+22*l)/451);
+  const mes=Math.floor((h+l-7*m+114)/31);
+  const dia=((h+l-7*m+114)%31)+1;
+  const pascoa=new Date(ano,mes-1,dia);
+  const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x;};
+  
+  const feriados=[
+    {data:new Date(ano,0,1),nome:'Confraternização Universal'},
+    {data:addDays(pascoa,-48),nome:'Carnaval'},
+    {data:addDays(pascoa,-47),nome:'Carnaval'},
+    {data:addDays(pascoa,-2),nome:'Sexta-feira Santa'},
+    {data:pascoa,nome:'Páscoa'},
+    {data:addDays(pascoa,60),nome:'Corpus Christi'},
+    {data:new Date(ano,3,21),nome:'Tiradentes'},
+    {data:new Date(ano,4,1),nome:'Dia do Trabalho'},
+    {data:new Date(ano,8,7),nome:'Independência do Brasil'},
+    {data:new Date(ano,9,12),nome:'Nossa Sra. Aparecida'},
+    {data:new Date(ano,10,2),nome:'Finados'},
+    {data:new Date(ano,10,15),nome:'Proclamação da República'},
+    {data:new Date(ano,11,25),nome:'Natal'},
+  ];
+  return feriados;
+}
+
+function isFeriado(date) {
+  const feriados=getFeriados(date.getFullYear());
+  return feriados.find(f=>f.data.toDateString()===date.toDateString());
+}
+
 function getWeekDays(date){
   const d=new Date(date);
   const day=d.getDay();
-  const mon=new Date(d);mon.setDate(d.getDate()-day);
+  // Começar na segunda (1), se domingo (0) voltar 6 dias
+  const diff=day===0?6:day-1;
+  const mon=new Date(d);mon.setDate(d.getDate()-diff);
   return Array.from({length:7},(_,i)=>{const x=new Date(mon);x.setDate(mon.getDate()+i);return x;});
 }
 
@@ -707,9 +757,11 @@ async function renderCal(){
       <div class="cal-corner">GMT-3</div>
       ${days.map(d=>{
         const isToday=d.toDateString()===hoje.toDateString();
-        return`<div class="cal-day-label${isToday?' today':''}">
+        const feriadoDia=isFeriado(d);
+        return`<div class="cal-day-label${isToday?' today':''}${feriadoDia?' feriado':''}">
           <div class="weekday">${diasSem[d.getDay()]}</div>
           <div class="daynum">${d.getDate()}</div>
+          ${feriadoDia?`<div style="font-size:9px;color:#c0392b;line-height:1.1;margin-top:2px">${feriadoDia.nome}</div>`:''}
         </div>`;
       }).join('')}
     </div>
@@ -999,6 +1051,29 @@ async function deletePDF(folder, name) {
   await sb.storage.from('exames').remove([folder + '/' + name]);
   const pacNome = folder.replace(/_/g, ' ');
   await carregarPDFs(editingId, pacNome);
+}
+
+
+async function uploadDocColab(files, nomeColab) {
+  if (!files?.length) return;
+  const folder = 'colaboradores/' + nomeColab.replace(/[^a-zA-Z0-9 ]/g,'').replace(/\s+/g,'_');
+  for (const file of Array.from(files)) {
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    await sb.storage.from('exames').upload(`${folder}/${Date.now()}_${safe}`, file, {upsert:true});
+  }
+  await carregarDocsColab(nomeColab);
+}
+
+async function carregarDocsColab(nomeColab) {
+  const list = document.getElementById('colab-docs-list');
+  if (!list || !nomeColab) return;
+  const folder = 'colaboradores/' + nomeColab.replace(/[^a-zA-Z0-9 ]/g,'').replace(/\s+/g,'_');
+  const {data:files} = await sb.storage.from('exames').list(folder, {limit:20});
+  if (!files?.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted)">Nenhum documento anexado.</div>'; return; }
+  list.innerHTML = files.filter(f=>f.name).map(f => {
+    const {data:u} = sb.storage.from('exames').getPublicUrl(folder+'/'+f.name);
+    return `<div class="pdf-item"><a href="${u.publicUrl}" target="_blank">📄 ${f.name}</a><button class="btn-del" onclick="deletePDF('${folder}','${f.name}')">🗑</button></div>`;
+  }).join('');
 }
 
 async function excluirExame(id) {
@@ -1373,11 +1448,34 @@ const modalForms={
       <div class="form-group"><label>Tipo</label><select id="f-tipo-prog"><option value="sinfonia" ${d.tipo==='sinfonia'?'selected':''}>Sinfonia</option><option value="pacote">Pacote</option><option value="outro">Outro</option></select></div>
     </div>
     <div class="form-grid">
-      <div class="form-group"><label>Valor total (R$)</label><input type="number" id="f-val-prog" value="${d.valor_total||''}"/></div>
-      <div class="form-group"><label>Forma de pagamento</label><input id="f-forma-prog" value="${d.forma_pagamento||''}"/></div>
+      <div class="form-group"><label>Duração do programa</label><select id="f-duracao-prog"><option value="">—</option><option value="1" ${d.duracao_meses==1?'selected':''}>1 mês</option><option value="2" ${d.duracao_meses==2?'selected':''}>2 meses</option><option value="3" ${d.duracao_meses==3?'selected':''}>3 meses</option><option value="4" ${d.duracao_meses==4?'selected':''}>4 meses</option><option value="5" ${d.duracao_meses==5?'selected':''}>5 meses</option><option value="6" ${d.duracao_meses==6?'selected':''}>6 meses</option></select></div>
+      <div class="form-group"><label>Data de início</label><input type="date" id="f-inicio-prog" value="${d.data_inicio||''}"/></div>
     </div>
     <div class="form-grid">
-      <div class="form-group"><label>Data de início</label><input type="date" id="f-inicio-prog" value="${d.data_inicio||''}"/></div>
+      <div class="form-group"><label>Valor total (R$)</label><input type="number" id="f-val-prog" value="${d.valor_total||''}"/></div>
+      <div class="form-group"><label>Forma de pagamento</label><select id="f-forma-prog" onchange="toggleParcelas()">
+        <option value="Pix" ${d.forma_pagamento==='Pix'?'selected':''}>Pix</option>
+        <option value="Cartão débito" ${d.forma_pagamento==='Cartão débito'?'selected':''}>Cartão débito</option>
+        <option value="Crédito à vista" ${d.forma_pagamento==='Crédito à vista'?'selected':''}>Crédito à vista</option>
+        <option value="Crédito parcelado" ${d.forma_pagamento==='Crédito parcelado'?'selected':''}>Crédito parcelado</option>
+        <option value="Transferência" ${d.forma_pagamento==='Transferência'?'selected':''}>Transferência</option>
+      </select></div>
+    </div>
+    <div class="form-grid" id="parcelas-row" style="display:${d.forma_pagamento==='Crédito parcelado'?'grid':'none'}">
+      <div class="form-group"><label>Nº de parcelas</label><select id="f-parcelas-prog"><option value="2" ${d.num_parcelas==2?'selected':''}>2x</option><option value="3" ${d.num_parcelas==3?'selected':''}>3x</option><option value="4" ${d.num_parcelas==4?'selected':''}>4x</option></select></div>
+      <div class="form-group"><label>Valor por parcela (R$)</label><input type="number" id="f-val-parcela" value="${d.valor_parcela||''}" placeholder="Calculado auto"/></div>
+    </div>
+    <div style="margin:8px 0 4px;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;">Nota fiscal do programa</div>
+    <div class="form-grid">
+      <div class="form-group"><label>NF emissão</label><select id="f-prog-nf-tipo">
+        <option value="">—</option>
+        <option value="vista" ${d.nf_prog_tipo==='vista'?'selected':''}>De uma vez (valor total)</option>
+        <option value="3meses" ${d.nf_prog_tipo==='3meses'?'selected':''}>Dividida em 3 meses</option>
+        <option value="4meses" ${d.nf_prog_tipo==='4meses'?'selected':''}>Dividida em 4 meses</option>
+      </select></div>
+      <div class="form-group"><label>Link da NF</label><input id="f-prog-nf-link" value="${d.nf_prog_link||''}" placeholder="https://..."/></div>
+    </div>
+    <div class="form-grid">
       <div class="form-group"><label>Status</label><select id="f-st-prog"><option value="em_andamento">Em andamento</option><option value="pag_pendente">Pag. pendente</option><option value="concluido">Concluído</option><option value="cancelado">Cancelado</option><option value="pausado">Pausado</option></select></div>
     </div>
     <div style="margin:8px 0 4px;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;">Consultas por especialidade</div>
@@ -1392,6 +1490,10 @@ const modalForms={
       <div class="form-group"><label>Realizadas</label><input type="number" id="f-cons-psico-real" value="${d.cons_psico_real||0}" min="0"/></div>
       <div class="form-group"><label>Personal (total)</label><input type="number" id="f-cons-personal-total" value="${d.cons_personal_total||0}" min="0"/></div>
       <div class="form-group"><label>Realizadas</label><input type="number" id="f-cons-personal-real" value="${d.cons_personal_real||0}" min="0"/></div>
+    </div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+      <div class="form-group"><label>Sono Biologix (total)</label><input type="number" id="f-cons-sono-total" value="${d.cons_sono_total||0}" min="0"/></div>
+      <div class="form-group"><label>Realizadas</label><input type="number" id="f-cons-sono-real" value="${d.cons_sono_real||0}" min="0"/></div>
     </div>`,
 
   exame:(d={})=>`<h3>Exames do paciente</h3>
@@ -1425,9 +1527,27 @@ const modalForms={
 
   colaborador:(d={})=>`<h3>Colaborador</h3>
     <div class="form-grid">
-      <div class="form-group"><label>Nome</label><input id="f-colab-nome" value="${d.nome||''}"/></div>
+      <div class="form-group"><label>Nome completo</label><input id="f-colab-nome" value="${d.nome||''}"/></div>
       <div class="form-group"><label>Cargo</label><input id="f-colab-cargo" value="${d.cargo||''}"/></div>
     </div>
+    <div class="form-grid">
+      <div class="form-group"><label>CPF</label><input id="f-colab-cpf" value="${d.cpf||''}" placeholder="000.000.000-00"/></div>
+      <div class="form-group"><label>RG</label><input id="f-colab-rg" value="${d.rg||''}"/></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Data de nascimento</label><input type="date" id="f-colab-nasc" value="${d.data_nascimento||''}"/></div>
+      <div class="form-group"><label>Telefone</label><input id="f-colab-tel" value="${d.telefone||''}"/></div>
+    </div>
+    <div style="margin:8px 0 4px;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;">Endereço</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Rua / Número</label><input id="f-colab-rua" value="${d.endereco_rua||''}"/></div>
+      <div class="form-group"><label>Bairro</label><input id="f-colab-bairro" value="${d.endereco_bairro||''}"/></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Cidade / UF</label><input id="f-colab-cidade" value="${d.endereco_cidade||''}"/></div>
+      <div class="form-group"><label>CEP</label><input id="f-colab-cep" value="${d.endereco_cep||''}"/></div>
+    </div>
+    <div style="margin:8px 0 4px;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;">Contrato & Pagamento</div>
     <div class="form-grid">
       <div class="form-group"><label>Regime</label><select id="f-colab-regime"><option value="MEI" ${d.regime==='MEI'?'selected':''}>MEI</option><option value="CLT" ${d.regime==='CLT'?'selected':''}>CLT</option><option value="PJ" ${d.regime==='PJ'?'selected':''}>PJ</option><option value="Autônomo" ${d.regime==='Autônomo'?'selected':''}>Autônomo</option></select></div>
       <div class="form-group"><label>Dia de pagamento</label><input type="number" id="f-colab-diapag" value="${d.dia_pagamento||''}" min="1" max="31" placeholder="Ex: 5"/></div>
@@ -1439,6 +1559,16 @@ const modalForms={
     <div class="form-grid">
       <div class="form-group"><label>Banco</label><input id="f-colab-banco" value="${d.banco||''}"/></div>
       <div class="form-group"><label>Data de admissão</label><input type="date" id="f-colab-adm" value="${d.data_admissao||''}"/></div>
+    </div>
+    <div style="margin:8px 0 4px;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;">Documentos anexados</div>
+    <div class="form-grid full">
+      <div class="form-group">
+        <div class="upload-area" onclick="document.getElementById('f-colab-doc').click()" style="padding:14px;">
+          <input type="file" id="f-colab-doc" accept=".pdf,image/*" multiple onchange="uploadDocColab(this.files,'${d.nome||'colaborador'}')"/>
+          <div style="font-size:13px;color:var(--muted)">📎 Clique para anexar documentos / contrato (PDF ou imagem)</div>
+        </div>
+        <div id="colab-docs-list" style="margin-top:8px">${d.nome?'<div style="font-size:12px;color:var(--muted)">Carregando documentos...</div>':''}</div>
+      </div>
     </div>
     <div class="form-grid full"><div class="form-group"><label>Observações</label><textarea id="f-colab-obs">${d.observacoes||''}</textarea></div></div>`,
 
@@ -1488,6 +1618,16 @@ const modalForms={
     </div>`,
 };
 
+function toggleParcelas(){
+  const sel=document.getElementById('f-forma-prog');
+  const row=document.getElementById('parcelas-row');
+  if(row)row.style.display=sel?.value==='Crédito parcelado'?'grid':'none';
+  // calcular valor parcela
+  const val=parseFloat(document.getElementById('f-val-prog')?.value)||0;
+  const n=parseInt(document.getElementById('f-parcelas-prog')?.value)||1;
+  const vp=document.getElementById('f-val-parcela');
+  if(vp&&val&&n)vp.value=(val/n).toFixed(2);
+}
 function toggleNFLink(){
   const sel=document.getElementById('f-nf-status');
   const row=document.getElementById('nf-link-row');
@@ -1526,6 +1666,7 @@ async function openModalEdit(type,id){
       acInput('f-pac-ex','ac-list-ex');
       if(id && data?.pacientes?.nome) await carregarPDFs(id, data.pacientes.nome);
     }
+    if(type==='colaborador' && data?.nome) await carregarDocsColab(data.nome);
   },100);
 }
 
@@ -1542,7 +1683,10 @@ async function saveModal(){
 
   if(type==='agendamento'){
     const pid=await getPacId(document.getElementById('f-pac-nome')?.value?.trim());
-    const payload={paciente_id:pid,tipo:document.getElementById('f-tipo-ag')?.value,data_hora:document.getElementById('f-data-hora')?.value,valor:document.getElementById('f-valor')?.value||null,forma_pagamento:document.getElementById('f-forma-pag')?.value||null,data_pagamento:document.getElementById('f-data-pag')?.value||null,nf_status:document.getElementById('f-nf-status')?.value,nf_numero:document.getElementById('f-nf-num')?.value||null,nf_link:document.getElementById('f-nf-link')?.value||null,status:document.getElementById('f-status-ag')?.value,observacoes:document.getElementById('f-obs')?.value||null};
+    const rawDH=document.getElementById('f-data-hora')?.value;
+    // converter para ISO com fuso Brasília (UTC-3)
+    const dataHoraBsb=rawDH?new Date(rawDH+':00-03:00').toISOString():null;
+    const payload={paciente_id:pid,tipo:document.getElementById('f-tipo-ag')?.value,data_hora:dataHoraBsb,valor:document.getElementById('f-valor')?.value||null,forma_pagamento:document.getElementById('f-forma-pag')?.value||null,data_pagamento:document.getElementById('f-data-pag')?.value||null,nf_status:document.getElementById('f-nf-status')?.value,nf_numero:document.getElementById('f-nf-num')?.value||null,nf_link:document.getElementById('f-nf-link')?.value||null,status:document.getElementById('f-status-ag')?.value,observacoes:document.getElementById('f-obs')?.value||null};
     if(editingId)await sb.from('agendamentos').update(payload).eq('id',editingId);
     else await sb.from('agendamentos').insert(payload);
     if(payload.status==='realizada'&&pid)await sb.from('pacientes').update({ultima_consulta:payload.data_hora?.split('T')[0]}).eq('id',pid);
@@ -1564,14 +1708,23 @@ async function saveModal(){
     const prreal=parseInt(document.getElementById('f-cons-personal-real')?.value)||0;
     const total_consultas=etotal+ntotal+ptotal+prtotal||6;
     const realizadas=ereal+nreal+preal+prreal;
+    const stotal=parseInt(document.getElementById('f-cons-sono-total')?.value)||0;
+    const sreal=parseInt(document.getElementById('f-cons-sono-real')?.value)||0;
+    const total_consultas2=etotal+ntotal+ptotal+prtotal+stotal||6;
     const payload={paciente_id:pid,tipo:document.getElementById('f-tipo-prog')?.value,
-      total_consultas,realizadas,
+      total_consultas:total_consultas2,realizadas,
+      duracao_meses:document.getElementById('f-duracao-prog')?.value||null,
       cons_endo_total:etotal,cons_endo_real:ereal,
       cons_nutri_total:ntotal,cons_nutri_real:nreal,
       cons_psico_total:ptotal,cons_psico_real:preal,
       cons_personal_total:prtotal,cons_personal_real:prreal,
+      cons_sono_total:stotal,cons_sono_real:sreal,
       valor_total:document.getElementById('f-val-prog')?.value||null,
       forma_pagamento:document.getElementById('f-forma-prog')?.value||null,
+      num_parcelas:document.getElementById('f-parcelas-prog')?.value||null,
+      valor_parcela:document.getElementById('f-val-parcela')?.value||null,
+      nf_prog_tipo:document.getElementById('f-prog-nf-tipo')?.value||null,
+      nf_prog_link:document.getElementById('f-prog-nf-link')?.value||null,
       data_inicio:document.getElementById('f-inicio-prog')?.value||null,
       status:document.getElementById('f-st-prog')?.value};
     if(editingId)await sb.from('programas').update(payload).eq('id',editingId);
@@ -1611,7 +1764,7 @@ async function saveModal(){
     else await sb.from('leads').insert(payload);
   }
   else if(type==='colaborador'){
-    const payload={nome:document.getElementById('f-colab-nome')?.value,cargo:document.getElementById('f-colab-cargo')?.value||null,regime:document.getElementById('f-colab-regime')?.value||null,dia_pagamento:document.getElementById('f-colab-diapag')?.value||null,salario_base:document.getElementById('f-colab-sal')?.value||null,banco:document.getElementById('f-colab-banco')?.value||null,chave_pix:document.getElementById('f-colab-pix')?.value||null,data_admissao:document.getElementById('f-colab-adm')?.value||null,observacoes:document.getElementById('f-colab-obs')?.value||null};
+    const payload={nome:document.getElementById('f-colab-nome')?.value,cargo:document.getElementById('f-colab-cargo')?.value||null,cpf:document.getElementById('f-colab-cpf')?.value||null,rg:document.getElementById('f-colab-rg')?.value||null,data_nascimento:document.getElementById('f-colab-nasc')?.value||null,telefone:document.getElementById('f-colab-tel')?.value||null,endereco_rua:document.getElementById('f-colab-rua')?.value||null,endereco_bairro:document.getElementById('f-colab-bairro')?.value||null,endereco_cidade:document.getElementById('f-colab-cidade')?.value||null,endereco_cep:document.getElementById('f-colab-cep')?.value||null,regime:document.getElementById('f-colab-regime')?.value||null,dia_pagamento:document.getElementById('f-colab-diapag')?.value||null,salario_base:document.getElementById('f-colab-sal')?.value||null,banco:document.getElementById('f-colab-banco')?.value||null,chave_pix:document.getElementById('f-colab-pix')?.value||null,data_admissao:document.getElementById('f-colab-adm')?.value||null,observacoes:document.getElementById('f-colab-obs')?.value||null};
     if(editingId)await sb.from('colaboradores').update(payload).eq('id',editingId);
     else await sb.from('colaboradores').insert(payload);
   }
