@@ -920,7 +920,7 @@ async function loadProgramas(){
 
 // ── FINANCEIRO ────────────────────────────────────────────────
 async function loadFinanceiro(){
-  if(currentProfile?.perfil!=='proprietaria'){document.getElementById('financeiro-body').innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--red)">Acesso restrito.</td></tr>';return;}
+  // financeiro liberado para proprietaria e secretaria
   const sel=document.getElementById('f-mes');
   if(sel&&sel.options.length<=1){const ano=new Date().getFullYear();for(let i=0;i<12;i++)sel.add(new Option(meses[i]+' '+ano,(i+1).toString().padStart(2,'0')+'/'+ano));}
   const{data}=await sb.from('agendamentos').select('*,pacientes(nome)').order('data_hora',{ascending:false}).limit(300);
