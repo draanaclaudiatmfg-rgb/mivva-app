@@ -477,11 +477,16 @@ tr:hover td{background:var(--bg2);}
     <!-- DASHBOARD -->
     <div class="tab-pane" id="tab-dashboard">
       <div class="sec-header"><h2>Dashboard Financeiro</h2>
-        <select id="dash-ano" onchange="loadDashboard()" style="font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;"></select>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="dash-ano" onchange="loadDashboard()" style="font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;"></select>
+          <select id="dash-mes" onchange="loadDashboard()" style="font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;">
+            <option value="">Ano todo</option>
+          </select>
+        </div>
       </div>
       <div class="metrics">
-        <div class="metric"><div class="metric-label">Receita total ano</div><div class="metric-value green" id="d-total">R$ 0</div></div>
-        <div class="metric"><div class="metric-label">Melhor mês</div><div class="metric-value" id="d-melhor">—</div></div>
+        <div class="metric"><div class="metric-label">Receita do período</div><div class="metric-value green" id="d-total">R$ 0</div></div>
+        <div class="metric"><div class="metric-label">Período / Melhor mês</div><div class="metric-value" id="d-melhor">—</div></div>
         <div class="metric"><div class="metric-label">Ticket médio</div><div class="metric-value" id="d-ticket">—</div></div>
         <div class="metric"><div class="metric-label">Total consultas</div><div class="metric-value" id="d-cons">—</div></div>
       </div>
@@ -1149,9 +1154,24 @@ async function loadRH(){
 async function loadDashboard(){
   if(currentProfile?.perfil!=='proprietaria')return;
   const sel=document.getElementById('dash-ano');
-  if(!sel.options.length){const ano=new Date().getFullYear();for(let y=ano;y>=ano-2;y--)sel.add(new Option(y,y));}
+  const selMes=document.getElementById('dash-mes');
+  if(!sel.options.length){
+    const ano=new Date().getFullYear();
+    for(let y=ano;y>=ano-2;y--)sel.add(new Option(y,y));
+  }
+  if(selMes&&selMes.options.length===1){
+    meses.forEach((m,i)=>selMes.add(new Option(m,(i+1).toString().padStart(2,'0'))));
+  }
   const ano=parseInt(sel.value)||new Date().getFullYear();
-  const{data}=await sb.from('agendamentos').select('*').gte('data_hora',`${ano}-01-01`).lte('data_hora',`${ano}-12-31`).eq('status','realizada');
+  const mesSel=selMes?.value;
+  let startDate=`${ano}-01-01`;
+  let endDate=`${ano}-12-31`;
+  if(mesSel){
+    startDate=`${ano}-${mesSel}-01`;
+    const lastDay=new Date(ano,parseInt(mesSel),0).getDate();
+    endDate=`${ano}-${mesSel}-${lastDay}`;
+  }
+  const{data}=await sb.from('agendamentos').select('*').gte('data_hora',startDate).lte('data_hora',endDate+'T23:59:59').eq('status','realizada');
   const rows=data||[];
   const recMes=Array(12).fill(0);
   rows.filter(r=>r.data_pagamento).forEach(r=>{recMes[new Date(r.data_hora).getMonth()]+=Number(r.valor)||0;});
@@ -1159,8 +1179,9 @@ async function loadDashboard(){
   const formas={};rows.forEach(r=>{const f=r.forma_pagamento||'Outro';formas[f]=(formas[f]||0)+(Number(r.valor)||0);});
   const total=recMes.reduce((s,v)=>s+v,0);
   const melhorI=recMes.indexOf(Math.max(...recMes));
+  const labelPeriodo=mesSel?meses[parseInt(mesSel)-1]+' '+ano:'Ano '+ano;
   document.getElementById('d-total').textContent=fmtR(total);
-  document.getElementById('d-melhor').textContent=meses[melhorI];
+  document.getElementById('d-melhor').textContent=mesSel?labelPeriodo:meses[melhorI];
   document.getElementById('d-ticket').textContent=fmtR(rows.length?total/rows.length:0);
   document.getElementById('d-cons').textContent=rows.length;
   const purple='#5C2D6E',colors=['#5C2D6E','#7A4A8A','#C4A8D4','#3B6D11','#185FA5','#854F0B','#A32D2D'];
@@ -1287,6 +1308,41 @@ async function excluirLead(id) {
   await sb.from('leads').delete().eq('id', id);
   closeModal();
   loadLeads();
+}
+
+
+// ── UPLOAD PDF NO MODAL DE AGENDAMENTO ────────────────────────
+function handleDropAgendamento(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag');
+  const files = Array.from(e.dataTransfer.files);
+  if (files.length) uploadExamesAgendamento(files);
+}
+
+async function uploadExamesAgendamento(files) {
+  if (!files?.length) return;
+  const pacNome = (document.getElementById('f-pac-nome')?.value?.trim() || 'geral').replace(/[^a-zA-Z0-9 ]/g,'').replace(/\s+/g,'_');
+  for (const file of Array.from(files)) {
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    await sb.storage.from('exames').upload(`${pacNome}/${Date.now()}_${safe}`, file, {upsert:true});
+  }
+  await carregarPDFsAgendamento(pacNome);
+}
+
+async function carregarPDFsAgendamento(pacNome) {
+  const list = document.getElementById('ag-pdf-list');
+  if (!list || !pacNome) return;
+  const folder = pacNome.replace(/[^a-zA-Z0-9 ]/g,'').replace(/\s+/g,'_');
+  const {data:files} = await sb.storage.from('exames').list(folder, {limit:20});
+  if (!files?.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted)">Nenhum exame anexado ainda.</div>'; return; }
+  list.innerHTML = files.filter(f=>f.name).map(f => {
+    const {data:u} = sb.storage.from('exames').getPublicUrl(folder+'/'+f.name);
+    const isImg = /\.(jpg|jpeg|png|gif)$/i.test(f.name);
+    return `<div class="pdf-item">
+      <a href="${u.publicUrl}" target="_blank">${isImg?'🖼':'📄'} ${f.name}</a>
+      <button class="btn-del" onclick="deletePDF('${folder}','${f.name}')">🗑</button>
+    </div>`;
+  }).join('');
 }
 
 // ── PAINEL LATERAL EXAMES ─────────────────────────────────────
@@ -1417,6 +1473,16 @@ const modalForms={
     </div>
     <div class="form-grid full"><div class="form-group"><label>Status</label><select id="f-status-ag"><option value="agendada" ${d.status==='agendada'?'selected':''}>Agendada</option><option value="realizada" ${d.status==='realizada'?'selected':''}>Realizada</option><option value="cancelada" ${d.status==='cancelada'?'selected':''}>Cancelada</option><option value="remarcada" ${d.status==='remarcada'?'selected':''}>Remarcada</option></select></div></div>
     <div class="form-grid full"><div class="form-group"><label>Observações</label><textarea id="f-obs">${d.observacoes||''}</textarea></div></div>
+    <div class="form-grid full">
+      <div class="form-group">
+        <label>PDFs dos exames</label>
+        <div class="upload-area" onclick="document.getElementById('f-ag-pdf-input').click()" style="padding:14px;" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDropAgendamento(event)">
+          <input type="file" id="f-ag-pdf-input" accept=".pdf,image/*" multiple onchange="uploadExamesAgendamento(this.files)"/>
+          <div style="font-size:13px;color:var(--muted)">📎 Clique ou arraste PDFs / imagens de exames</div>
+        </div>
+        <div id="ag-pdf-list" style="margin-top:8px">${d.pacientes?.nome?'<div style=\"font-size:12px;color:var(--muted)\">Carregando exames...</div>':''}</div>
+      </div>
+    </div>
     ${d.id?`<div style="margin-top:8px;padding-top:12px;border-top:1px solid var(--border)"><button onclick="excluirAgendamento('${d.id}')" style="background:none;border:1px solid var(--red);color:var(--red);padding:7px 14px;border-radius:var(--radius);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;">🗑 Excluir agendamento</button></div>`:''}`,
 
   paciente:(d={})=>`<h3>${d.id?'Editar paciente':'Nova paciente'}</h3>
@@ -1660,7 +1726,10 @@ async function openModalEdit(type,id){
   document.getElementById('modal-inner').innerHTML=modalForms[type]?.(data||{})||'';
   document.getElementById('modal-bg').classList.add('open');
   setTimeout(async ()=>{
-    if(type==='agendamento')acInput('f-pac-nome','ac-list-pac');
+    if(type==='agendamento'){
+      acInput('f-pac-nome','ac-list-pac');
+      if(data?.pacientes?.nome) await carregarPDFsAgendamento(data.pacientes.nome);
+    }
     if(type==='programa')acInput('f-pac-prog','ac-list-prog');
     if(type==='exame'){
       acInput('f-pac-ex','ac-list-ex');
