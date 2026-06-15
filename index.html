@@ -1794,7 +1794,6 @@ async function saveModal(){
     const dataEntrada = document.getElementById('f-lead-data')?.value;
     let followupData = null;
     if (followupDias === 'manter') {
-      // manter data já existente - buscar do registro atual
       if (editingId) {
         const { data: cur } = await sb.from('leads').select('followup_data').eq('id', editingId).single();
         followupData = cur?.followup_data || null;
@@ -1819,7 +1818,6 @@ async function saveModal(){
       observacoes: document.getElementById('f-lead-obs')?.value || null,
     };
     if (dataEntrada) {
-      // manter o horário, só ajustar a data
       const horaAtual = editingId ? null : new Date().toISOString().split('T')[1];
       payload.created_at = dataEntrada + 'T' + (horaAtual || '12:00:00.000Z');
     }
