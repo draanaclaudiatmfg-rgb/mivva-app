@@ -1205,7 +1205,8 @@ async function loadLeads() {
   const convertidos = leads.filter(l => l.status === 'convertido').length;
   const agendados = leads.filter(l => l.status === 'agendado').length;
   const andamento = leads.filter(l => ['novo','em_contato'].includes(l.status)).length;
-  const taxa = total ? Math.round((convertidos / total) * 100) : 0;
+  const consultaram = convertidos + agendados;
+  const taxa = total ? Math.round((consultaram / total) * 100) : 0;
 
   // Follow ups vencidos/hoje
   const followupHoje = leads.filter(l => {
