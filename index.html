@@ -385,9 +385,12 @@ tr:hover td{background:var(--bg2);}
         <div style="display:flex;gap:8px;align-items:center;">
           <div style="display:flex;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
             <button class="cal-view-btn active" id="leads-view-semana" onclick="setLeadsView('semana')">Semana</button>
-            <button class="cal-view-btn" id="leads-view-mes" onclick="setLeadsView('mes')">Mês</button>
+            <button class="cal-view-btn" id="leads-view-mes" onclick="setLeadsView('mes')">Mês atual</button>
             <button class="cal-view-btn" id="leads-view-todos" onclick="setLeadsView('todos')">Todos</button>
           </div>
+          <select id="leads-mes-sel" onchange="setLeadsView('mes-especifico')" style="font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;">
+            <option value="">Mês específico...</option>
+          </select>
           <button class="btn-primary" onclick="openModal('lead')">+ Novo lead</button>
         </div>
       </div>
@@ -426,53 +429,6 @@ tr:hover td{background:var(--bg2);}
     </div>
 
     <!-- DASHBOARD -->
-
-    <!-- LEADS -->
-    <div class="tab-pane" id="tab-leads">
-      <div class="sec-header">
-        <h2>Gestão de Leads</h2>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <div style="display:flex;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-            <button class="cal-view-btn active" id="leads-view-semana" onclick="setLeadsView('semana')">Semana</button>
-            <button class="cal-view-btn" id="leads-view-mes" onclick="setLeadsView('mes')">Mês</button>
-            <button class="cal-view-btn" id="leads-view-todos" onclick="setLeadsView('todos')">Todos</button>
-          </div>
-          <button class="btn-primary" onclick="openModal('lead')">+ Novo lead</button>
-        </div>
-      </div>
-
-      <!-- Métricas -->
-      <div class="metrics" id="leads-metrics">
-        <div class="metric"><div class="metric-label">Total leads</div><div class="metric-value" id="lm-total">—</div></div>
-        <div class="metric"><div class="metric-label">Consultaram</div><div class="metric-value green" id="lm-convertidos">—</div></div>
-        <div class="metric"><div class="metric-label">Em andamento</div><div class="metric-value amber" id="lm-andamento">—</div></div>
-        <div class="metric"><div class="metric-label">Follow up hoje</div><div class="metric-value red" id="lm-followup">—</div></div>
-        <div class="metric" style="background:var(--pale)">
-          <div class="metric-label">Taxa de conversão</div>
-          <div class="metric-value" id="lm-taxa" style="color:var(--pm)">—</div>
-        </div>
-      </div>
-
-      <!-- Follow ups urgentes -->
-      <div id="leads-followup-urgente"></div>
-
-      <!-- Tabela -->
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>Data entrada</th>
-            <th>Nome</th>
-            <th>Origem</th>
-            <th>Interesse</th>
-            <th>Status</th>
-            <th>Follow up</th>
-            <th>WhatsApp</th>
-            <th></th>
-          </tr></thead>
-          <tbody id="leads-body"><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
-        </table>
-      </div>
-    </div>
 
     <!-- DASHBOARD -->
     <div class="tab-pane" id="tab-dashboard">
@@ -1203,20 +1159,42 @@ function setLeadsView(v) {
   leadsView = v;
   document.querySelectorAll('[id^="leads-view-"]').forEach(b => b.classList.remove('active'));
   document.getElementById('leads-view-' + v)?.classList.add('active');
+  if (v !== 'mes-especifico') { const s = document.getElementById('leads-mes-sel'); if (s) s.value = ''; }
   loadLeads();
 }
 
+function popularMesesLeads() {
+  const sel = document.getElementById('leads-mes-sel');
+  if (!sel || sel.options.length > 1) return;
+  const hoje = new Date();
+  for (let i = 0; i < 18; i++) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    const val = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    sel.add(new Option(meses[d.getMonth()] + ' ' + d.getFullYear(), val));
+  }
+}
+
 async function loadLeads() {
+  popularMesesLeads();
   let q = sb.from('leads').select('*').order('created_at', { ascending: false });
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   if (leadsView === 'semana') {
-    const start = new Date(hoje); start.setDate(hoje.getDate() - hoje.getDay());
+    const diff = hoje.getDay() === 0 ? 6 : hoje.getDay() - 1;
+    const start = new Date(hoje); start.setDate(hoje.getDate() - diff);
     const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23,59,59,999);
     q = q.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
   } else if (leadsView === 'mes') {
     const start = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
     const end = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0); end.setHours(23,59,59,999);
     q = q.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+  } else if (leadsView === 'mes-especifico') {
+    const sel = document.getElementById('leads-mes-sel')?.value;
+    if (sel) {
+      const [ano, mes] = sel.split('-').map(Number);
+      const start = new Date(ano, mes - 1, 1);
+      const end = new Date(ano, mes, 0); end.setHours(23,59,59,999);
+      q = q.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+    }
   }
 
   const { data } = await q.limit(200);
@@ -1644,6 +1622,10 @@ const modalForms={
       <div class="form-group"><label>Telefone / WhatsApp</label><input id="f-lead-tel" value="${d.telefone||''}" placeholder="11999998888"/></div>
     </div>
     <div class="form-grid">
+      <div class="form-group"><label>Data de entrada / contato</label><input type="date" id="f-lead-data" value="${d.created_at?d.created_at.split('T')[0]:new Date().toISOString().split('T')[0]}"/></div>
+      <div class="form-group"></div>
+    </div>
+    <div class="form-grid">
       <div class="form-group"><label>Origem</label><select id="f-lead-origem"><option value="Instagram" ${d.origem==='Instagram'?'selected':''}>Instagram</option><option value="Indicação" ${d.origem==='Indicação'?'selected':''}>Indicação</option><option value="WhatsApp" ${d.origem==='WhatsApp'?'selected':''}>WhatsApp</option><option value="Site" ${d.origem==='Site'?'selected':''}>Site</option><option value="Google" ${d.origem==='Google'?'selected':''}>Google</option><option value="Outro" ${d.origem==='Outro'?'selected':''}>Outro</option></select></div>
       <div class="form-group"><label>Interesse</label><select id="f-lead-interesse"><option value="Sinfonia" ${d.interesse==='Sinfonia'?'selected':''}>Sinfonia</option><option value="Consulta avulsa" ${d.interesse==='Consulta avulsa'?'selected':''}>Consulta avulsa</option><option value="Lipedema" ${d.interesse==='Lipedema'?'selected':''}>Lipedema</option><option value="Menopausa" ${d.interesse==='Menopausa'?'selected':''}>Menopausa</option><option value="Emagrecimento" ${d.interesse==='Emagrecimento'?'selected':''}>Emagrecimento</option><option value="Outro" ${d.interesse==='Outro'?'selected':''}>Outro</option></select></div>
     </div>
@@ -1655,11 +1637,12 @@ const modalForms={
         <option value="convertido" ${d.status==='convertido'?'selected':''}>Convertido ✓</option>
         <option value="perdido" ${d.status==='perdido'?'selected':''}>Perdido</option>
       </select></div>
-      <div class="form-group"><label>Follow up em</label><select id="f-lead-followup">
+      <div class="form-group"><label>Follow up - próxima ação</label><select id="f-lead-followup">
         <option value="">Sem follow up</option>
-        <option value="3">3 dias</option>
-        <option value="5">5 dias</option>
-        <option value="7">7 dias</option>
+        <option value="3">+3 dias a partir de hoje</option>
+        <option value="5">+5 dias a partir de hoje</option>
+        <option value="7">+7 dias a partir de hoje</option>
+        <option value="manter" ${d.followup_data?'selected':''}>Manter data atual${d.followup_data?' ('+fmt(d.followup_data)+')':''}</option>
       </select></div>
     </div>
     <div class="form-grid">
@@ -1720,7 +1703,7 @@ function openModal(type,extraId){
 
 async function openModalEdit(type,id){
   currentModal=type;editingId=id;acSelected=null;
-  const tm={agendamento:'agendamentos',paciente:'pacientes',programa:'programas',exame:'exames',colaborador:'colaboradores'};
+  const tm={agendamento:'agendamentos',paciente:'pacientes',programa:'programas',exame:'exames',colaborador:'colaboradores',lead:'leads'};
   const jm={agendamento:'*,pacientes(nome,telefone,email,diagnostico,medicacao)',programa:'*,pacientes(nome)',exame:'*,pacientes(nome)'};
   const{data}=await sb.from(tm[type]).select(jm[type]||'*').eq('id',id).single();
   document.getElementById('modal-inner').innerHTML=modalForms[type]?.(data||{})||'';
@@ -1808,13 +1791,19 @@ async function saveModal(){
   else if(type==='lead'){
     const followupDias = document.getElementById('f-lead-followup')?.value;
     const naoResp = document.getElementById('f-lead-nao-resp')?.value === 'sim';
+    const dataEntrada = document.getElementById('f-lead-data')?.value;
     let followupData = null;
-    if (followupDias) {
+    if (followupDias === 'manter') {
+      // manter data já existente - buscar do registro atual
+      if (editingId) {
+        const { data: cur } = await sb.from('leads').select('followup_data').eq('id', editingId).single();
+        followupData = cur?.followup_data || null;
+      }
+    } else if (followupDias) {
       const d = new Date();
       d.setDate(d.getDate() + parseInt(followupDias));
       followupData = d.toISOString().split('T')[0];
     } else if (naoResp && !editingId) {
-      // se não respondeu e novo lead, agenda follow up em 3 dias automaticamente
       const d = new Date();
       d.setDate(d.getDate() + 3);
       followupData = d.toISOString().split('T')[0];
@@ -1829,6 +1818,11 @@ async function saveModal(){
       nao_respondeu: naoResp,
       observacoes: document.getElementById('f-lead-obs')?.value || null,
     };
+    if (dataEntrada) {
+      // manter o horário, só ajustar a data
+      const horaAtual = editingId ? null : new Date().toISOString().split('T')[1];
+      payload.created_at = dataEntrada + 'T' + (horaAtual || '12:00:00.000Z');
+    }
     if (editingId) await sb.from('leads').update(payload).eq('id', editingId);
     else await sb.from('leads').insert(payload);
   }
